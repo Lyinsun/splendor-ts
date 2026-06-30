@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "generated_at": "2026-06-30",
+  "mode": "built-in image_gen",
+  "outputs": [
+    {
+      "path": "assets/splendor-monsters/themes/crystal-observatory/arena-hero.png",
+      "width": 1672,
+      "height": 941,
+      "usage": "dashboard_hero",
+      "source_copy": "/Users/bytedance/.codex/generated_images/019f179e-aea5-7ec0-95d4-3ec25fc5999a/ig_00172fe8de1040ac016a43ab5555ec8191afd3059f38371318.png"
+    }
+  ],
+  "prompt": {
+    "use_case": "stylized-concept",
+    "asset_type": "dashboard hero background for a TypeScript multiplayer board-game MVP",
+    "primary_request": "Create an original alternate theme arena for an elemental companion board game, distinct from existing elemental-league art.",
+    "scene": "A crystalline sky observatory arena with floating game tables, colored elemental lanterns, polished stone floor, and soft aurora light in the distance.",
+    "constraints": "Original IP only; no official Pokemon, Splendor, Nintendo, or Asmodee marks; no text; no logos; no watermark."
+  }
+}

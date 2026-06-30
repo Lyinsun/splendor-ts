@@ -4,7 +4,7 @@
   "mode": "built-in image_gen",
   "outputs": [
     {
-      "path": "assets/splendor-monsters/arena-hero.png",
+      "path": "assets/splendor-monsters/themes/elemental-league/arena-hero.png",
       "width": 1672,
       "height": 941,
       "usage": "dashboard_hero",

@@ -16,8 +16,8 @@
   - `docs/模块设计/01-游戏引擎与房间同步.md`
   - `docs/V1实现设计/`
 - Generated and saved original dashboard hero art:
-  - `assets/splendor-monsters/arena-hero.png`
-  - `assets/splendor-monsters/image-generation/arena-hero-manifest.json`
+  - `assets/splendor-monsters/themes/elemental-league/arena-hero.png`
+  - `assets/splendor-monsters/image-generation/elemental-league/arena-hero-manifest.json`
 - Verification passed:
   - `npm run typecheck`
   - `npm test`
@@ -29,3 +29,10 @@
 ## Known Remaining Work
 
 - Visual browser screenshot QA was not available because no browser-control tool was exposed in this session.
+
+## 2026-06-30 Theme/Locale Update
+
+- Added Dashboard presentation layer for `zh-CN` / `en-US` text, element labels, companion display names, mentor display names, and basic log localization.
+- Split art assets into theme directories under `assets/splendor-monsters/themes/`.
+- Added `elemental-league` and generated `crystal-observatory` hero assets with per-theme generation manifests.
+- Kept theme and locale as display concerns only; no authoritative game-rule state was changed.

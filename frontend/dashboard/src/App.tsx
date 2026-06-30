@@ -1,26 +1,60 @@
-import { Copy, Gem, Play, RefreshCw, ShieldPlus, Sparkles, Users } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import type { CardSource, CardTier, CompanionCard, Element, ElementCost, GameState, PlayerState, TokenKind } from './api/types';
+import { Copy, Gem, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users } from 'lucide-react';
+import { type CSSProperties, useState } from 'react';
+import type { CardSource, CardTier, CompanionCard, ElementCost, GameState, PlayerState, TokenKind } from './api/types';
 import { ELEMENTS } from './api/types';
 import { useGameRoom } from './hooks/useGameRoom';
+import {
+  APP_COPY,
+  LOCALE_OPTIONS,
+  THEME_OPTIONS,
+  THEMES,
+  browserDefaultLocale,
+  cardText,
+  formatLogMessage,
+  leaderName,
+  normalizeLocale,
+  normalizeThemeId,
+  tokenClassName,
+  tokenLabel,
+  type Locale,
+  type ThemeId,
+} from './presentation/themes';
 
-const ELEMENT_META: Record<Element | 'prism', { label: string; className: string }> = {
-  fire: { label: 'Fire', className: 'token-fire' },
-  water: { label: 'Water', className: 'token-water' },
-  grass: { label: 'Grass', className: 'token-grass' },
-  electric: { label: 'Volt', className: 'token-electric' },
-  psychic: { label: 'Mind', className: 'token-psychic' },
-  prism: { label: 'Prism', className: 'token-prism' },
-};
+const LOCALE_KEY = 'splendor-monsters-locale';
+const THEME_KEY = 'splendor-monsters-theme';
+
+type AppCopy = (typeof APP_COPY)[Locale];
 
 export function App() {
   const game = useGameRoom();
+  const [locale, setLocaleState] = useState<Locale>(() => normalizeLocale(localStorage.getItem(LOCALE_KEY), browserDefaultLocale()));
+  const [themeId, setThemeIdState] = useState<ThemeId>(() => normalizeThemeId(localStorage.getItem(THEME_KEY)));
+  const copy = APP_COPY[locale];
+  const theme = THEMES[themeId];
   const [draftName, setDraftName] = useState(game.playerName);
-  const [roomName, setRoomName] = useState('Element League Table');
+  const [roomName, setRoomName] = useState(theme.defaultRoomName[locale]);
   const [tokenSelection, setTokenSelection] = useState<TokenKind[]>([]);
 
   const room = game.room;
   const myPlayer = game.currentPlayer;
+  const appStyle = { '--hero-image': `url("${theme.assets.hero.src}")` } as CSSProperties;
+
+  const handleLocaleChange = (nextLocale: Locale) => {
+    setLocaleState(nextLocale);
+    localStorage.setItem(LOCALE_KEY, nextLocale);
+    if (isDefaultRoomName(roomName)) {
+      setRoomName(theme.defaultRoomName[nextLocale]);
+    }
+  };
+
+  const handleThemeChange = (nextThemeId: ThemeId) => {
+    const nextTheme = THEMES[nextThemeId];
+    setThemeIdState(nextThemeId);
+    localStorage.setItem(THEME_KEY, nextThemeId);
+    if (isDefaultRoomName(roomName)) {
+      setRoomName(nextTheme.defaultRoomName[locale]);
+    }
+  };
 
   const handleTakeTokens = async () => {
     await game.takeTokens(tokenSelection);
@@ -28,18 +62,25 @@ export function App() {
   };
 
   return (
-    <main className="app">
+    <main className={`app ${theme.className}`} style={appStyle}>
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark"><Sparkles size={20} /></div>
           <div>
-            <h1>Splendor Monsters</h1>
-            <span>TypeScript multiplayer MVP</span>
+            <h1>{copy.appTitle}</h1>
+            <span>{copy.appSubtitle}</span>
           </div>
         </div>
         <div className="topbar-actions">
-          <StatusPill label={game.connected ? 'Live sync' : 'Offline sync'} tone={game.connected ? 'good' : 'muted'} />
-          <button className="icon-button" type="button" onClick={() => void game.refreshRooms()} disabled={game.busy} title="Refresh rooms">
+          <PresentationControls
+            copy={copy}
+            locale={locale}
+            themeId={themeId}
+            onLocaleChange={handleLocaleChange}
+            onThemeChange={handleThemeChange}
+          />
+          <StatusPill label={game.connected ? copy.liveSync : copy.offlineSync} tone={game.connected ? 'good' : 'muted'} />
+          <button className="icon-button" type="button" onClick={() => void game.refreshRooms()} disabled={game.busy} title={copy.refreshRooms}>
             <RefreshCw size={18} />
           </button>
         </div>
@@ -47,20 +88,22 @@ export function App() {
 
       {game.error !== null && <div className="error-banner">{game.error}</div>}
 
-      <section className="hero-panel">
+      <section className="hero-panel" aria-label={theme.assets.hero.alt[locale]}>
         <div className="hero-copy">
-          <p className="eyebrow">Element companion league</p>
-          <h2>{room?.roomName ?? 'Create or join a trainer table'}</h2>
-          <p>{room === null ? 'Rooms are local to this running server. Open another browser window to join as a second trainer.' : `${room.players.length} trainers · round ${room.round} · turn ${room.turn}`}</p>
+          <p className="eyebrow">{copy.heroEyebrow}</p>
+          <h2>{room?.roomName ?? copy.noRoomTitle}</h2>
+          <p>{room === null ? copy.noRoomDescription : copy.roomMeta(room.players.length, room.round, room.turn)}</p>
         </div>
         <div className="hero-meta">
-          <StatusPill label={room?.status ?? 'no room'} tone={room?.status === 'playing' ? 'good' : 'muted'} />
-          {room?.finalRoundStartedBy !== null && room?.finalRoundStartedBy !== undefined ? <StatusPill label="Final round" tone="warn" /> : null}
+          <StatusPill label={theme.label[locale]} tone="muted" />
+          <StatusPill label={room === null ? copy.noRoomStatus : copy.roomStatus[room.status]} tone={room?.status === 'playing' ? 'good' : 'muted'} />
+          {room?.finalRoundStartedBy !== null && room?.finalRoundStartedBy !== undefined ? <StatusPill label={copy.finalRound} tone="warn" /> : null}
         </div>
       </section>
 
       {room === null ? (
         <Lobby
+          copy={copy}
           rooms={game.rooms}
           playerName={draftName}
           roomName={roomName}
@@ -75,13 +118,15 @@ export function App() {
         />
       ) : (
         <GameTable
+          copy={copy}
+          locale={locale}
           room={room}
           myPlayer={myPlayer}
           playerId={game.playerId}
           busy={game.busy}
           isHost={game.isHost}
           isMyTurn={game.isMyTurn}
-          activePlayerName={game.activePlayer?.name ?? 'Waiting'}
+          activePlayerName={game.activePlayer?.name ?? copy.watching}
           tokenSelection={tokenSelection}
           onTokenSelect={(token) => setTokenSelection((current) => nextTokenSelection(current, token))}
           onClearTokens={() => setTokenSelection([])}
@@ -97,7 +142,39 @@ export function App() {
   );
 }
 
+function PresentationControls(props: {
+  copy: AppCopy;
+  locale: Locale;
+  themeId: ThemeId;
+  onLocaleChange: (locale: Locale) => void;
+  onThemeChange: (themeId: ThemeId) => void;
+}) {
+  return (
+    <div className="presentation-controls">
+      <label className="select-control">
+        <Languages size={16} />
+        <span>{props.copy.languageLabel}</span>
+        <select value={props.locale} onChange={(event) => props.onLocaleChange(normalizeLocale(event.target.value, props.locale))}>
+          {LOCALE_OPTIONS.map((option) => (
+            <option key={option.id} value={option.id}>{option.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="select-control">
+        <Palette size={16} />
+        <span>{props.copy.themeLabel}</span>
+        <select value={props.themeId} onChange={(event) => props.onThemeChange(normalizeThemeId(event.target.value))}>
+          {THEME_OPTIONS.map((theme) => (
+            <option key={theme.id} value={theme.id}>{theme.label[props.locale]}</option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
 function Lobby(props: {
+  copy: AppCopy;
   rooms: Array<{ roomId: string; roomName: string; status: GameState['status']; players: number; maxPlayers: number }>;
   playerName: string;
   roomName: string;
@@ -110,30 +187,30 @@ function Lobby(props: {
   return (
     <section className="lobby-grid">
       <div className="panel lobby-form">
-        <h3>Trainer seat</h3>
+        <h3>{props.copy.trainerSeat}</h3>
         <label>
-          Name
+          {props.copy.nameLabel}
           <input value={props.playerName} onChange={(event) => props.onPlayerNameChange(event.target.value)} />
         </label>
         <label>
-          Room
+          {props.copy.roomLabel}
           <input value={props.roomName} onChange={(event) => props.onRoomNameChange(event.target.value)} />
         </label>
         <button type="button" className="primary-button" onClick={props.onCreate} disabled={props.busy}>
-          <Users size={18} /> Create room
+          <Users size={18} /> {props.copy.createRoom}
         </button>
       </div>
       <div className="panel room-list">
-        <h3>Open rooms</h3>
-        {props.rooms.length === 0 ? <p className="empty">No rooms yet.</p> : null}
+        <h3>{props.copy.openRooms}</h3>
+        {props.rooms.length === 0 ? <p className="empty">{props.copy.noRooms}</p> : null}
         {props.rooms.map((room) => (
           <div className="room-row" key={room.roomId}>
             <div>
               <strong>{room.roomName}</strong>
-              <span>{room.players}/{room.maxPlayers} trainers · {room.status}</span>
+              <span>{props.copy.playerCount(room.players, room.maxPlayers, room.status)}</span>
             </div>
             <button type="button" onClick={() => props.onJoin(room.roomId)} disabled={props.busy || room.status !== 'lobby'}>
-              Join
+              {props.copy.join}
             </button>
           </div>
         ))}
@@ -143,6 +220,8 @@ function Lobby(props: {
 }
 
 function GameTable(props: {
+  copy: AppCopy;
+  locale: Locale;
   room: GameState;
   myPlayer: PlayerState | undefined;
   playerId: string;
@@ -166,40 +245,42 @@ function GameTable(props: {
       <aside className="panel side-panel">
         <div className="room-tools">
           <button type="button" className="ghost-button" onClick={() => copyRoomId(props.room.roomId)}>
-            <Copy size={16} /> Copy room
+            <Copy size={16} /> {props.copy.copyRoom}
           </button>
-          <button type="button" className="ghost-button" onClick={props.onLeave}>Leave</button>
+          <button type="button" className="ghost-button" onClick={props.onLeave}>{props.copy.leave}</button>
         </div>
-        <h3>Trainers</h3>
+        <h3>{props.copy.trainers}</h3>
         <div className="player-stack">
           {props.room.players.map((player) => (
-            <PlayerPanel key={player.id} player={player} active={props.room.currentPlayerId === player.id} mine={props.playerId === player.id} />
+            <PlayerPanel key={player.id} copy={props.copy} locale={props.locale} player={player} active={props.room.currentPlayerId === player.id} mine={props.playerId === player.id} />
           ))}
         </div>
         {props.room.status === 'lobby' ? (
           <div className="lobby-actions">
             <button type="button" onClick={props.onAddDemoPlayer} disabled={props.busy || props.room.players.length >= 4}>
-              <ShieldPlus size={16} /> Demo rival
+              <ShieldPlus size={16} /> {props.copy.demoRival}
             </button>
             <button type="button" className="primary-button" onClick={props.onStart} disabled={props.busy || !props.isHost || props.room.players.length < 2}>
-              <Play size={18} /> Start
+              <Play size={18} /> {props.copy.start}
             </button>
           </div>
         ) : null}
-        {props.room.status === 'finished' ? <div className="winner-box">Winner: {winnerNames}</div> : null}
+        {props.room.status === 'finished' ? <div className="winner-box">{props.copy.winner}: {winnerNames}</div> : null}
       </aside>
 
       <section className="play-area">
         <div className="panel turn-panel">
           <div>
-            <p className="eyebrow">Current turn</p>
-            <h3>{props.room.status === 'playing' ? props.activePlayerName : props.room.status}</h3>
+            <p className="eyebrow">{props.copy.currentTurn}</p>
+            <h3>{props.room.status === 'playing' ? props.activePlayerName : props.copy.roomStatus[props.room.status]}</h3>
           </div>
-          <StatusPill label={props.isMyTurn ? 'Your move' : 'Watching'} tone={props.isMyTurn ? 'good' : 'muted'} />
+          <StatusPill label={props.isMyTurn ? props.copy.yourMove : props.copy.watching} tone={props.isMyTurn ? 'good' : 'muted'} />
         </div>
 
         {props.room.status === 'playing' ? (
           <BankPanel
+            copy={props.copy}
+            locale={props.locale}
             room={props.room}
             disabled={!props.isMyTurn || props.busy}
             tokenSelection={props.tokenSelection}
@@ -213,6 +294,8 @@ function GameTable(props: {
           {[3, 2, 1].map((tier) => (
             <MarketTier
               key={tier}
+              copy={props.copy}
+              locale={props.locale}
               tier={tier as CardTier}
               cards={props.room.board.market[tier as CardTier]}
               disabled={!props.isMyTurn || props.busy || props.room.status !== 'playing'}
@@ -224,12 +307,12 @@ function GameTable(props: {
         </div>
 
         <section className="panel mentor-panel">
-          <h3>Gym mentors</h3>
+          <h3>{props.copy.gymMentors}</h3>
           <div className="mentor-row">
             {props.room.board.gymLeaders.map((leader) => (
-              <div className={`mentor ${ELEMENT_META[leader.element].className}`} key={leader.id}>
-                <strong>{leader.name}</strong>
-                <span>{leader.points} glory</span>
+              <div className={`mentor ${tokenClassName(leader.element)}`} key={leader.id}>
+                <strong>{leaderName(leader, props.locale)}</strong>
+                <span>{leader.points} {props.copy.glory}</span>
                 <CostList cost={leader.requirement} />
               </div>
             ))}
@@ -238,11 +321,13 @@ function GameTable(props: {
       </section>
 
       <aside className="panel side-panel">
-        <h3>Your reserve</h3>
-        {props.myPlayer?.reserved.length === 0 ? <p className="empty">No reserved companions.</p> : null}
+        <h3>{props.copy.yourReserve}</h3>
+        {props.myPlayer?.reserved.length === 0 ? <p className="empty">{props.copy.noReserved}</p> : null}
         {props.myPlayer?.reserved.map((card) => (
           <CompanionCardView
             key={card.id}
+            copy={props.copy}
+            locale={props.locale}
             card={card}
             compact
             disabled={!props.isMyTurn || props.busy}
@@ -250,12 +335,12 @@ function GameTable(props: {
             onBuy={() => props.onBuy({ kind: 'reserved', cardId: card.id })}
           />
         ))}
-        <h3>Battle log</h3>
+        <h3>{props.copy.battleLog}</h3>
         <div className="log-list">
           {props.room.logs.slice(0, 12).map((entry) => (
             <div className="log-entry" key={entry.id}>
-              <span>Turn {entry.turn}</span>
-              <p>{entry.message}</p>
+              <span>{props.copy.turn} {entry.turn}</span>
+              <p>{formatLogMessage(entry, props.locale)}</p>
             </div>
           ))}
         </div>
@@ -265,6 +350,8 @@ function GameTable(props: {
 }
 
 function BankPanel(props: {
+  copy: AppCopy;
+  locale: Locale;
   room: GameState;
   disabled: boolean;
   tokenSelection: TokenKind[];
@@ -272,35 +359,35 @@ function BankPanel(props: {
   onClearTokens: () => void;
   onTakeTokens: () => void;
 }) {
-  const selectionText = props.tokenSelection.length === 0 ? 'No energy selected' : props.tokenSelection.map((token) => ELEMENT_META[token].label).join(', ');
+  const selectionText = props.tokenSelection.length === 0 ? props.copy.noEnergySelected : props.tokenSelection.map((token) => tokenLabel(token, props.locale)).join(', ');
   return (
     <section className="panel bank-panel">
       <div>
-        <h3>Energy bank</h3>
+        <h3>{props.copy.energyBank}</h3>
         <p>{selectionText}</p>
       </div>
       <div className="bank-tokens">
         {(['fire', 'water', 'grass', 'electric', 'psychic'] satisfies TokenKind[]).map((token) => (
           <button
             type="button"
-            className={`token-button ${ELEMENT_META[token].className}`}
+            className={`token-button ${tokenClassName(token)}`}
             key={token}
             disabled={props.disabled || props.room.board.bank[token] <= 0}
             onClick={() => props.onTokenSelect(token)}
           >
-            <span>{ELEMENT_META[token].label}</span>
+            <span>{tokenLabel(token, props.locale)}</span>
             <strong>{props.room.board.bank[token]}</strong>
           </button>
         ))}
-        <div className={`token-button token-static ${ELEMENT_META.prism.className}`}>
-          <span>Prism</span>
+        <div className={`token-button token-static ${tokenClassName('prism')}`}>
+          <span>{tokenLabel('prism', props.locale)}</span>
           <strong>{props.room.board.bank.prism}</strong>
         </div>
       </div>
       <div className="bank-actions">
-        <button type="button" onClick={props.onClearTokens} disabled={props.disabled || props.tokenSelection.length === 0}>Clear</button>
+        <button type="button" onClick={props.onClearTokens} disabled={props.disabled || props.tokenSelection.length === 0}>{props.copy.clear}</button>
         <button type="button" className="primary-button" onClick={props.onTakeTokens} disabled={props.disabled || props.tokenSelection.length === 0}>
-          <Gem size={18} /> Take energy
+          <Gem size={18} /> {props.copy.takeEnergy}
         </button>
       </div>
     </section>
@@ -308,6 +395,8 @@ function BankPanel(props: {
 }
 
 function MarketTier(props: {
+  copy: AppCopy;
+  locale: Locale;
   tier: CardTier;
   cards: CompanionCard[];
   disabled: boolean;
@@ -318,13 +407,15 @@ function MarketTier(props: {
   return (
     <section className="panel market-tier">
       <div className="tier-heading">
-        <h3>Tier {props.tier}</h3>
-        <span>{props.cards.length} open</span>
+        <h3>{props.copy.tier} {props.tier}</h3>
+        <span>{props.cards.length} {props.copy.open}</span>
       </div>
       <div className="card-row">
         {props.cards.map((card) => (
           <CompanionCardView
             key={card.id}
+            copy={props.copy}
+            locale={props.locale}
             card={card}
             disabled={props.disabled}
             affordable={props.player === undefined ? false : canAfford(props.player, card)}
@@ -338,6 +429,8 @@ function MarketTier(props: {
 }
 
 function CompanionCardView(props: {
+  copy: AppCopy;
+  locale: Locale;
   card: CompanionCard;
   disabled: boolean;
   affordable: boolean;
@@ -345,43 +438,44 @@ function CompanionCardView(props: {
   onReserve?: () => void;
   onBuy: () => void;
 }) {
+  const text = cardText(props.card, props.locale);
   return (
-    <article className={`companion-card ${ELEMENT_META[props.card.element].className} ${props.compact === true ? 'compact-card' : ''}`}>
+    <article className={`companion-card ${tokenClassName(props.card.element)} ${props.compact === true ? 'compact-card' : ''}`}>
       <div className="card-art">
-        <span>{props.card.species.slice(0, 1)}</span>
+        <span>{text.species.slice(0, 1)}</span>
       </div>
       <div className="card-body">
         <div className="card-title">
-          <strong>{props.card.name}</strong>
-          <span>{props.card.points} glory</span>
+          <strong>{text.name}</strong>
+          <span>{props.card.points} {props.copy.glory}</span>
         </div>
-        <small>{props.card.species}</small>
+        <small>{text.species}</small>
         <CostList cost={props.card.cost} />
       </div>
       <div className="card-actions">
-        <button type="button" onClick={props.onBuy} disabled={props.disabled || !props.affordable}>Buy</button>
-        {props.onReserve !== undefined ? <button type="button" onClick={props.onReserve} disabled={props.disabled}>Reserve</button> : null}
+        <button type="button" onClick={props.onBuy} disabled={props.disabled || !props.affordable}>{props.copy.buy}</button>
+        {props.onReserve !== undefined ? <button type="button" onClick={props.onReserve} disabled={props.disabled}>{props.copy.reserve}</button> : null}
       </div>
     </article>
   );
 }
 
-function PlayerPanel(props: { player: PlayerState; active: boolean; mine: boolean }) {
+function PlayerPanel(props: { copy: AppCopy; locale: Locale; player: PlayerState; active: boolean; mine: boolean }) {
   return (
     <article className={`player-panel ${props.active ? 'active' : ''}`}>
       <div className="player-heading">
-        <strong>{props.player.name}{props.mine ? ' · you' : ''}</strong>
-        <span>{props.player.score} glory</span>
+        <strong>{props.player.name}{props.mine ? ` · ${props.copy.you}` : ''}</strong>
+        <span>{props.player.score} {props.copy.glory}</span>
       </div>
       <div className="bonus-row">
         {ELEMENTS.map((element) => (
-          <span className={`mini-token ${ELEMENT_META[element].className}`} key={element}>{props.player.bonuses[element]}</span>
+          <span className={`mini-token ${tokenClassName(element)}`} title={tokenLabel(element, props.locale)} key={element}>{props.player.bonuses[element]}</span>
         ))}
-        <span className={`mini-token ${ELEMENT_META.prism.className}`}>{props.player.tokens.prism}</span>
+        <span className={`mini-token ${tokenClassName('prism')}`} title={tokenLabel('prism', props.locale)}>{props.player.tokens.prism}</span>
       </div>
       <div className="token-row">
         {ELEMENTS.map((element) => (
-          <span key={element}>{ELEMENT_META[element].label}: {props.player.tokens[element]}</span>
+          <span key={element}>{tokenLabel(element, props.locale)}: {props.player.tokens[element]}</span>
         ))}
       </div>
     </article>
@@ -394,7 +488,7 @@ function CostList(props: { cost: ElementCost }) {
       {ELEMENTS.map((element) => {
         const value = props.cost[element] ?? 0;
         if (value <= 0) return null;
-        return <span className={`cost-chip ${ELEMENT_META[element].className}`} key={element}>{value}</span>;
+        return <span className={`cost-chip ${tokenClassName(element)}`} key={element}>{value}</span>;
       })}
     </div>
   );
@@ -424,4 +518,8 @@ function canAfford(player: PlayerState, card: CompanionCard): boolean {
 
 function copyRoomId(roomId: string): void {
   void navigator.clipboard?.writeText(roomId);
+}
+
+function isDefaultRoomName(value: string): boolean {
+  return THEME_OPTIONS.some((theme) => LOCALE_OPTIONS.some((locale) => theme.defaultRoomName[locale.id] === value));
 }

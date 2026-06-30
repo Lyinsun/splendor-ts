@@ -65,6 +65,7 @@ delivery / interfaces -> application -> domain
 - The first screen must be the usable multiplayer table/lobby, not a marketing landing page.
 - Dashboard code in `frontend/dashboard` may use only HTTP and WebSocket APIs. Do not import `src/game/domain` or application services into React.
 - Visual assets and `asset-index.json` are display metadata only. They must not change game existence, scores, cards, turns, or winner state.
+- Locale and theme selection are presentation concerns. They may translate labels, card display names, log text, and images, but must not change authoritative ids or rules.
 - Endpoint errors must be visible in the UI; do not silently render failures as empty game state.
 - Use compact, operations-oriented UI. Avoid large decorative hero-only layouts that hide the actual game table.
 
@@ -73,6 +74,8 @@ delivery / interfaces -> application -> domain
 - Use original creature names, card names, and generated art.
 - Do not store official Pokemon or Splendor art assets in this repository.
 - Generated project assets belong under `assets/splendor-monsters/`.
+- Theme-specific art belongs under `assets/splendor-monsters/themes/<theme-id>/`.
+- Theme generation metadata belongs under `assets/splendor-monsters/image-generation/<theme-id>/`.
 - Record generated asset metadata in `assets/splendor-monsters/asset-index.json`.
 - If a generated asset is referenced by code, it must be copied into the workspace and not left under a tool cache directory.
 

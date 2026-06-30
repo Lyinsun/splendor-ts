@@ -1,14 +1,42 @@
 {
-  "version": 1,
+  "version": 2,
   "base_path": "assets/splendor-monsters",
-  "assets": {
-    "hero": {
-      "path": "arena-hero.png",
-      "usage": "dashboard_hero",
-      "alt": "Original elemental companion arena"
+  "default_theme": "elemental-league",
+  "themes": {
+    "elemental-league": {
+      "labels": {
+        "zh-CN": "元素联盟",
+        "en-US": "Element League"
+      },
+      "assets": {
+        "hero": {
+          "path": "themes/elemental-league/arena-hero.png",
+          "usage": "dashboard_hero",
+          "alt": {
+            "zh-CN": "原创元素伙伴竞技场",
+            "en-US": "Original elemental companion arena"
+          }
+        }
+      }
+    },
+    "crystal-observatory": {
+      "labels": {
+        "zh-CN": "晶穹观测台",
+        "en-US": "Crystal Observatory"
+      },
+      "assets": {
+        "hero": {
+          "path": "themes/crystal-observatory/arena-hero.png",
+          "usage": "dashboard_hero",
+          "alt": {
+            "zh-CN": "原创晶穹观测台竞技场",
+            "en-US": "Original crystal observatory arena"
+          }
+        }
+      }
     }
   },
   "notes": {
-    "semantics": "Display metadata only. Assets do not define game state."
+    "semantics": "Display metadata only. Themes and assets do not define game state, rules, score, turn order, or winners."
   }
 }

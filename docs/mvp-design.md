@@ -39,6 +39,13 @@
 - WebSocket `/ws/rooms/:roomId` 广播 `room_state`。
 - 客户端断线后可重新 `GET /v1/rooms/:roomId` 恢复。
 
+## 展示主题与语言
+
+- Dashboard 支持 `zh-CN` 与 `en-US` 展示语言。
+- 主题资源以 `assets/splendor-monsters/themes/<theme-id>/` 分割，当前包含 `elemental-league` 与 `crystal-observatory`。
+- `frontend/dashboard/src/presentation/themes.ts` 负责把服务端稳定 id 映射为语言文案和主题资源路径。
+- `locale` 与 `themeId` 只影响显示，不改变服务端规则、卡牌 id、分数、回合或胜者。
+
 ## MVP 非目标
 
 - 不使用官方 IP 美术资源。

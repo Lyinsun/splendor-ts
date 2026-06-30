@@ -2,7 +2,7 @@
 
 ## 一、适用范围
 
-适用于 `frontend/dashboard/`、`scripts/sync-dashboard-assets.mjs`、`assets/splendor-monsters/` 的展示接入。
+适用于 `frontend/dashboard/`、`frontend/dashboard/src/presentation/`、`scripts/sync-dashboard-assets.mjs`、`assets/splendor-monsters/` 的展示接入。
 
 Dashboard 是浏览器操作台，不是规则引擎。
 
@@ -11,6 +11,7 @@ Dashboard 是浏览器操作台，不是规则引擎。
 - 不 import `src/game/domain`、`src/game/application` 或 `src/game/infrastructure`。
 - 不在前端计算权威分数、胜负、导师奖励或市场补牌。
 - 不把图片资源、日志、选择态写成游戏事实。
+- 不把 `locale` 或 `themeId` 写成领域规则。它们只决定显示文本和资源路径。
 - endpoint 失败必须展示错误。
 - WebSocket 消息只能更新为服务端广播的 `room_state`。
 
@@ -21,7 +22,8 @@ flowchart TD
     API["/v1/rooms/*"] --> Hook["useGameRoom"]
     WS["/ws/rooms/:roomId"] --> Hook
     Hook --> App["App.tsx"]
-    Assets["/assets/splendor-monsters/*"] -. "display only" .-> App
+    Presentation["presentation/themes.ts"] -. "locale/theme mapping" .-> App
+    Assets["/assets/splendor-monsters/themes/*"] -. "display only" .-> App
     App --> Action["POST actions"]
     Action --> API
 ```
@@ -34,8 +36,25 @@ flowchart TD
 - 禁止使用大篇说明文字代替可操作控件。
 - 移动端要避免卡片和按钮文字溢出。
 - 视觉资产应展示真实项目主题，不使用官方 IP 素材。
+- `zh-CN` 与 `en-US` 都必须能渲染主要 UI 文案、元素标签、卡牌显示名和导师显示名。
+- 新增主题时同步更新 `asset-index.json`、`frontend/dashboard/src/presentation/themes.ts` 和对应 `image-generation/<theme-id>/` manifest。
 
-## 五、验证
+## 五、资源结构
+
+```text
+assets/splendor-monsters/
+  asset-index.json
+  themes/
+    elemental-league/
+      arena-hero.png
+    crystal-observatory/
+      arena-hero.png
+  image-generation/
+    <theme-id>/
+      arena-hero-manifest.json
+```
+
+## 六、验证
 
 默认验证：
 

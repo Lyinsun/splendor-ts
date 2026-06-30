@@ -27,7 +27,10 @@ src/
     http/
   shared/
 frontend/dashboard/
+  src/presentation/
 assets/splendor-monsters/
+  themes/
+  image-generation/
 docs/
 test/
 ```
@@ -41,7 +44,8 @@ test/
 | 房间服务 | 已落地 | API 手工验证与后续集成测试 |
 | WebSocket 广播 | 已落地 | 多窗口手工验证 |
 | Dashboard MVP | 已落地 | `npm run build:dashboard` |
-| 原创美术资源 | 待完善 | 文件存在和页面加载验证 |
+| 原创美术资源 | 已落地 | 文件存在和页面加载验证 |
+| 主题资源分割与中英文展示 | 已落地 | `npm run typecheck` / `npm run build:dashboard` |
 
 ## 四、测试计划
 

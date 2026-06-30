@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "base_path": "assets/splendor-monsters",
   "default_theme": "elemental-league",
   "themes": {
@@ -31,6 +31,48 @@
           "alt": {
             "zh-CN": "原创晶穹观测台竞技场",
             "en-US": "Original crystal observatory arena"
+          }
+        }
+      }
+    },
+    "creature-academy": {
+      "labels": {
+        "zh-CN": "灵兽学院",
+        "en-US": "Creature Academy"
+      },
+      "assets": {
+        "hero": {
+          "path": "themes/creature-academy/arena-hero.png",
+          "usage": "dashboard_hero",
+          "alt": {
+            "zh-CN": "原创灵兽学院元素竞技场",
+            "en-US": "Original creature academy elemental arena"
+          }
+        },
+        "card_art": {
+          "strategy": "element-tier",
+          "base_path": "themes/creature-academy/cards",
+          "usage": "dashboard_companion_card_art",
+          "atlas": {
+            "path": "themes/creature-academy/cards/card-art-atlas.png",
+            "usage": "source_atlas_for_cropped_cards"
+          },
+          "variants": {
+            "fire_t1": { "path": "themes/creature-academy/cards/fire-t1.png" },
+            "fire_t2": { "path": "themes/creature-academy/cards/fire-t2.png" },
+            "fire_t3": { "path": "themes/creature-academy/cards/fire-t3.png" },
+            "water_t1": { "path": "themes/creature-academy/cards/water-t1.png" },
+            "water_t2": { "path": "themes/creature-academy/cards/water-t2.png" },
+            "water_t3": { "path": "themes/creature-academy/cards/water-t3.png" },
+            "grass_t1": { "path": "themes/creature-academy/cards/grass-t1.png" },
+            "grass_t2": { "path": "themes/creature-academy/cards/grass-t2.png" },
+            "grass_t3": { "path": "themes/creature-academy/cards/grass-t3.png" },
+            "electric_t1": { "path": "themes/creature-academy/cards/electric-t1.png" },
+            "electric_t2": { "path": "themes/creature-academy/cards/electric-t2.png" },
+            "electric_t3": { "path": "themes/creature-academy/cards/electric-t3.png" },
+            "psychic_t1": { "path": "themes/creature-academy/cards/psychic-t1.png" },
+            "psychic_t2": { "path": "themes/creature-academy/cards/psychic-t2.png" },
+            "psychic_t3": { "path": "themes/creature-academy/cards/psychic-t3.png" }
           }
         }
       }

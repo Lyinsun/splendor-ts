@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "generated_at": "2026-06-30",
+  "mode": "built-in image_gen",
+  "outputs": [
+    {
+      "path": "assets/splendor-monsters/themes/creature-academy/arena-hero.png",
+      "width": 1823,
+      "height": 863,
+      "usage": "dashboard_hero",
+      "source_copy": "/Users/bytedance/.codex/generated_images/019f179e-aea5-7ec0-95d4-3ec25fc5999a/ig_022d7f856bddd28f016a43b62e35b4819189f1acb2171044fb.png"
+    }
+  ],
+  "prompt": {
+    "use_case": "stylized-concept",
+    "asset_type": "dashboard hero image for a game theme",
+    "primary_request": "Create an original Creature Academy arena hero image for a Splendor-inspired multiplayer board-game dashboard.",
+    "scene": "A bright academy hall opening into an elemental arena with five training zones for fire, water, grass, electric, and psychic energy, gemstone tokens, and polished card-table surfaces.",
+    "constraints": "Original creature designs only; no official Pokemon characters, official silhouettes, logos, trademarks, readable text, or watermark."
+  }
+}

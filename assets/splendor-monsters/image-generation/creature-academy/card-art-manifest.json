@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "generated_at": "2026-06-30",
+  "mode": "built-in image_gen",
+  "source_atlas": {
+    "path": "assets/splendor-monsters/themes/creature-academy/cards/card-art-atlas.png",
+    "width": 1619,
+    "height": 971,
+    "source_copy": "/Users/bytedance/.codex/generated_images/019f179e-aea5-7ec0-95d4-3ec25fc5999a/ig_022d7f856bddd28f016a43b5847da48191b8ff247946310b0e.png"
+  },
+  "crop_strategy": {
+    "grid": "5 columns x 3 rows",
+    "columns": ["fire", "water", "grass", "electric", "psychic"],
+    "rows": ["tier 1 novice", "tier 2 evolved", "tier 3 apex"],
+    "output_size": "640x640",
+    "naming": "themes/creature-academy/cards/<element>-t<tier>.png"
+  },
+  "outputs": [
+    "assets/splendor-monsters/themes/creature-academy/cards/fire-t1.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/fire-t2.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/fire-t3.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/water-t1.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/water-t2.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/water-t3.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/grass-t1.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/grass-t2.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/grass-t3.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/electric-t1.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/electric-t2.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/electric-t3.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/psychic-t1.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/psychic-t2.png",
+    "assets/splendor-monsters/themes/creature-academy/cards/psychic-t3.png"
+  ],
+  "prompt": {
+    "use_case": "stylized-concept",
+    "asset_type": "game card art atlas",
+    "primary_request": "Create one clean 5-column by 3-row atlas of original collectible elemental companion creatures for a Splendor-inspired tabletop card game theme named Creature Academy.",
+    "composition": "Columns are fire, water, grass, electric, and psychic. Rows are novice, evolved, and apex. One centered creature per panel.",
+    "constraints": "Original designs only; no official Pokemon characters, official silhouettes, logos, trademarks, readable text, or watermark."
+  }
+}

@@ -8,6 +8,7 @@ import {
   LOCALE_OPTIONS,
   THEME_OPTIONS,
   THEMES,
+  cardArt,
   browserDefaultLocale,
   cardText,
   formatLogMessage,
@@ -120,6 +121,7 @@ export function App() {
         <GameTable
           copy={copy}
           locale={locale}
+          themeId={themeId}
           room={room}
           myPlayer={myPlayer}
           playerId={game.playerId}
@@ -222,6 +224,7 @@ function Lobby(props: {
 function GameTable(props: {
   copy: AppCopy;
   locale: Locale;
+  themeId: ThemeId;
   room: GameState;
   myPlayer: PlayerState | undefined;
   playerId: string;
@@ -296,6 +299,7 @@ function GameTable(props: {
               key={tier}
               copy={props.copy}
               locale={props.locale}
+              themeId={props.themeId}
               tier={tier as CardTier}
               cards={props.room.board.market[tier as CardTier]}
               disabled={!props.isMyTurn || props.busy || props.room.status !== 'playing'}
@@ -328,6 +332,7 @@ function GameTable(props: {
             key={card.id}
             copy={props.copy}
             locale={props.locale}
+            themeId={props.themeId}
             card={card}
             compact
             disabled={!props.isMyTurn || props.busy}
@@ -397,6 +402,7 @@ function BankPanel(props: {
 function MarketTier(props: {
   copy: AppCopy;
   locale: Locale;
+  themeId: ThemeId;
   tier: CardTier;
   cards: CompanionCard[];
   disabled: boolean;
@@ -416,6 +422,7 @@ function MarketTier(props: {
             key={card.id}
             copy={props.copy}
             locale={props.locale}
+            themeId={props.themeId}
             card={card}
             disabled={props.disabled}
             affordable={props.player === undefined ? false : canAfford(props.player, card)}
@@ -431,6 +438,7 @@ function MarketTier(props: {
 function CompanionCardView(props: {
   copy: AppCopy;
   locale: Locale;
+  themeId: ThemeId;
   card: CompanionCard;
   disabled: boolean;
   affordable: boolean;
@@ -438,11 +446,12 @@ function CompanionCardView(props: {
   onReserve?: () => void;
   onBuy: () => void;
 }) {
-  const text = cardText(props.card, props.locale);
+  const text = cardText(props.card, props.locale, props.themeId);
+  const art = cardArt(props.card, props.locale, props.themeId);
   return (
     <article className={`companion-card ${tokenClassName(props.card.element)} ${props.compact === true ? 'compact-card' : ''}`}>
       <div className="card-art">
-        <span>{text.species.slice(0, 1)}</span>
+        {art === null ? <span>{text.species.slice(0, 1)}</span> : <img src={art.src} alt={art.alt} loading="lazy" />}
       </div>
       <div className="card-body">
         <div className="card-title">

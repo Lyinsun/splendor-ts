@@ -49,10 +49,20 @@ assets/splendor-monsters/
       arena-hero.png
     crystal-observatory/
       arena-hero.png
+    creature-academy/
+      arena-hero.png
+      cards/
+        card-art-atlas.png
+        fire-t1.png
+        fire-t2.png
+        ...
   image-generation/
     <theme-id>/
       arena-hero-manifest.json
+      card-art-manifest.json
 ```
+
+卡图路径约定为 `cards/<element>-t<tier>.png`。前端只能把它作为 `CompanionCard` 的展示资源来读取，不允许让图片目录决定卡牌是否存在、费用、分数或回合结果。
 
 ## 六、验证
 

@@ -1,9 +1,9 @@
-import type { CompanionCard, Element, GameLogEntry, GameState, GymLeader, TokenKind } from '../api/types';
+import type { CardTier, CompanionCard, GameLogEntry, GameState, GymLeader, TokenKind } from '../api/types';
 
 export const LOCALES = ['zh-CN', 'en-US'] as const;
 export type Locale = (typeof LOCALES)[number];
 
-export const THEME_IDS = ['elemental-league', 'crystal-observatory'] as const;
+export const THEME_IDS = ['elemental-league', 'crystal-observatory', 'creature-academy'] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
 export interface ThemeDefinition {
@@ -16,6 +16,10 @@ export interface ThemeDefinition {
     hero: {
       src: string;
       alt: Record<Locale, string>;
+    };
+    cardArt?: {
+      basePath: string;
+      strategy: 'element-tier';
     };
   };
 }
@@ -73,6 +77,35 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
           'zh-CN': '原创晶穹观测台竞技场',
           'en-US': 'Original crystal observatory arena',
         },
+      },
+    },
+  },
+  'creature-academy': {
+    id: 'creature-academy',
+    className: 'theme-creature-academy',
+    label: {
+      'zh-CN': '灵兽学院',
+      'en-US': 'Creature Academy',
+    },
+    description: {
+      'zh-CN': '原创元素灵兽、属性训练场与徽章挑战构成的收集主题。',
+      'en-US': 'An original collectible-creature theme with elemental training halls and badge challenges.',
+    },
+    defaultRoomName: {
+      'zh-CN': '灵兽学院牌桌',
+      'en-US': 'Creature Academy Table',
+    },
+    assets: {
+      hero: {
+        src: '/assets/splendor-monsters/themes/creature-academy/arena-hero.png',
+        alt: {
+          'zh-CN': '原创灵兽学院元素竞技场',
+          'en-US': 'Original creature academy elemental arena',
+        },
+      },
+      cardArt: {
+        basePath: '/assets/splendor-monsters/themes/creature-academy/cards',
+        strategy: 'element-tier',
       },
     },
   },
@@ -277,6 +310,12 @@ const ZH_LEADER_COPY: Partial<Record<string, string>> = {
   'leader-prism': '棱晶导师',
 };
 
+const CARD_TIER_COPY: Record<CardTier, Record<Locale, string>> = {
+  1: { 'zh-CN': '初阶', 'en-US': 'Novice' },
+  2: { 'zh-CN': '进阶', 'en-US': 'Evolved' },
+  3: { 'zh-CN': '巅峰', 'en-US': 'Apex' },
+};
+
 export function browserDefaultLocale(): Locale {
   if (typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('zh')) {
     return 'zh-CN';
@@ -300,11 +339,34 @@ export function tokenClassName(token: TokenKind): string {
   return TOKEN_PRESENTATION[token].className;
 }
 
-export function cardText(card: CompanionCard, locale: Locale): { name: string; species: string } {
+export function cardText(card: CompanionCard, locale: Locale, themeId: ThemeId = 'elemental-league'): { name: string; species: string } {
   const translated = locale === 'zh-CN' ? ZH_CARD_COPY[card.id] : undefined;
+  const name = translated?.name ?? card.name;
+  const species = translated?.species ?? card.species;
+  if (themeId === 'creature-academy') {
+    const tier = CARD_TIER_COPY[card.tier][locale];
+    const element = tokenLabel(card.element, locale);
+    return {
+      name,
+      species: locale === 'zh-CN' ? `${element}${tier}伙伴 · ${species}` : `${tier} ${element} companion · ${species}`,
+    };
+  }
+
   return {
-    name: translated?.name ?? card.name,
-    species: translated?.species ?? card.species,
+    name,
+    species,
+  };
+}
+
+export function cardArt(card: CompanionCard, locale: Locale, themeId: ThemeId): { src: string; alt: string } | null {
+  const art = THEMES[themeId].assets.cardArt;
+  if (art === undefined) {
+    return null;
+  }
+  const text = cardText(card, locale, themeId);
+  return {
+    src: `${art.basePath}/${card.element}-t${card.tier}.png`,
+    alt: locale === 'zh-CN' ? `${text.name} 卡牌插画` : `${text.name} card art`,
   };
 }
 

@@ -75,6 +75,7 @@ delivery / interfaces -> application -> domain
 - Do not store official Pokemon or Splendor art assets in this repository.
 - Generated project assets belong under `assets/splendor-monsters/`.
 - Theme-specific art belongs under `assets/splendor-monsters/themes/<theme-id>/`.
+- Theme card art should use `assets/splendor-monsters/themes/<theme-id>/cards/<element>-t<tier>.png` unless a documented per-card strategy replaces it.
 - Theme generation metadata belongs under `assets/splendor-monsters/image-generation/<theme-id>/`.
 - Record generated asset metadata in `assets/splendor-monsters/asset-index.json`.
 - If a generated asset is referenced by code, it must be copied into the workspace and not left under a tool cache directory.

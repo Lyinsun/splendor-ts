@@ -36,3 +36,12 @@
 - Split art assets into theme directories under `assets/splendor-monsters/themes/`.
 - Added `elemental-league` and generated `crystal-observatory` hero assets with per-theme generation manifests.
 - Kept theme and locale as display concerns only; no authoritative game-rule state was changed.
+
+## 2026-06-30 Creature Academy Theme Slice
+
+- Added `creature-academy` as an original collectible-creature theme with `zh-CN` / `en-US` labels and room defaults.
+- Generated and saved a theme hero plus a 5-element x 3-tier card-art atlas.
+- Cropped 15 card art assets into `assets/splendor-monsters/themes/creature-academy/cards/<element>-t<tier>.png`.
+- Registered the card-art strategy in `asset-index.json` and generation manifests.
+- Dashboard now renders theme card art when available; the fallback placeholder remains for themes without card art.
+- No server-side rule state, card ids, costs, scores, turn order, or winner settlement changed.

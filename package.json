@@ -1,0 +1,38 @@
+{
+  "name": "splendor-monsters-ts",
+  "version": "0.1.0",
+  "description": "TypeScript MVP for a Splendor-inspired multiplayer elemental companion board game.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "node --watch --import tsx src/main.ts",
+    "dev:server": "node --watch --import tsx src/main.ts",
+    "dev:dashboard": "npm run sync:dashboard-assets && vite --config frontend/dashboard/vite.config.ts",
+    "start": "node --import tsx src/main.ts",
+    "sync:dashboard-assets": "node scripts/sync-dashboard-assets.mjs",
+    "build:dashboard": "npm run sync:dashboard-assets && vite build --config frontend/dashboard/vite.config.ts",
+    "typecheck": "npm run typecheck:server && npm run typecheck:dashboard",
+    "typecheck:server": "tsc --noEmit",
+    "typecheck:dashboard": "tsc --noEmit -p frontend/dashboard/tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.1",
+    "@vitejs/plugin-react": "^6.0.2",
+    "hono": "^4.12.16",
+    "lucide-react": "^0.561.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "vite": "^8.0.13",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  }
+}

@@ -44,7 +44,7 @@
 - Dashboard 支持 `zh-CN` 与 `en-US` 展示语言。
 - 主题资源以 `assets/splendor-monsters/themes/<theme-id>/` 分割，当前包含 `elemental-league`、`crystal-observatory` 与 `creature-academy`。
 - `frontend/dashboard/src/presentation/themes.ts` 负责把服务端稳定 id 映射为语言文案和主题资源路径。
-- `creature-academy` 使用原创收集灵兽视觉：`arena-hero.png` 作为大厅背景，`cards/<element>-t<tier>.png` 作为元素/等级卡面图。
+- `creature-academy` 使用原创收集灵兽视觉：`arena-hero.png` 作为大厅背景，`cards/<element>-t<tier>.png` 作为元素/等级卡面图，并在 `frontend/dashboard/src/presentation/creatureAcademy.ts` 为 45 张伙伴卡提供中英双语训练笔记。
 - `locale` 与 `themeId` 只影响显示，不改变服务端规则、卡牌 id、分数、回合或胜者。
 
 ## MVP 非目标

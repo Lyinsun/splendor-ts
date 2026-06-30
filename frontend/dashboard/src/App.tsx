@@ -9,6 +9,7 @@ import {
   THEME_OPTIONS,
   THEMES,
   cardArt,
+  cardFlavor,
   browserDefaultLocale,
   cardText,
   formatLogMessage,
@@ -448,6 +449,7 @@ function CompanionCardView(props: {
 }) {
   const text = cardText(props.card, props.locale, props.themeId);
   const art = cardArt(props.card, props.locale, props.themeId);
+  const flavor = cardFlavor(props.card, props.locale, props.themeId);
   return (
     <article className={`companion-card ${tokenClassName(props.card.element)} ${props.compact === true ? 'compact-card' : ''}`}>
       <div className="card-art">
@@ -459,6 +461,7 @@ function CompanionCardView(props: {
           <span>{props.card.points} {props.copy.glory}</span>
         </div>
         <small>{text.species}</small>
+        {flavor === null ? null : <p className="card-flavor">{flavor}</p>}
         <CostList cost={props.card.cost} />
       </div>
       <div className="card-actions">

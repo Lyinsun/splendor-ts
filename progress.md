@@ -45,3 +45,10 @@
 - Registered the card-art strategy in `asset-index.json` and generation manifests.
 - Dashboard now renders theme card art when available; the fallback placeholder remains for themes without card art.
 - No server-side rule state, card ids, costs, scores, turn order, or winner settlement changed.
+
+## 2026-06-30 Creature Academy Card Content Slice
+
+- Added `frontend/dashboard/src/presentation/creatureAcademy.ts` with `zh-CN` / `en-US` training notes for all 45 companion cards.
+- Dashboard card faces now show theme training notes when `creature-academy` is selected.
+- Added `docs/主题设计/01-灵兽学院主题设计.md` to document background abstraction, IP boundary, card content strategy, card-art strategy, and acceptance criteria.
+- Kept all card notes as presentation metadata only; no domain rules changed.

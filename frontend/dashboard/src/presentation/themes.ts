@@ -1,4 +1,5 @@
 import type { CardTier, CompanionCard, GameLogEntry, GameState, GymLeader, TokenKind } from '../api/types';
+import { creatureAcademyLore } from './creatureAcademy';
 
 export const LOCALES = ['zh-CN', 'en-US'] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -368,6 +369,13 @@ export function cardArt(card: CompanionCard, locale: Locale, themeId: ThemeId): 
     src: `${art.basePath}/${card.element}-t${card.tier}.png`,
     alt: locale === 'zh-CN' ? `${text.name} 卡牌插画` : `${text.name} card art`,
   };
+}
+
+export function cardFlavor(card: CompanionCard, locale: Locale, themeId: ThemeId): string | null {
+  if (themeId !== 'creature-academy') {
+    return null;
+  }
+  return creatureAcademyLore(card.id, locale);
 }
 
 export function leaderName(leader: GymLeader, locale: Locale): string {

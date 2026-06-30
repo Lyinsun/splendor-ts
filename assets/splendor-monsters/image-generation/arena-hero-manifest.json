@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generated_at": "2026-06-30",
+  "mode": "built-in image_gen",
+  "outputs": [
+    {
+      "path": "assets/splendor-monsters/arena-hero.png",
+      "width": 1672,
+      "height": 941,
+      "usage": "dashboard_hero",
+      "source_copy": "/Users/bytedance/.codex/generated_images/019f179e-aea5-7ec0-95d4-3ec25fc5999a/ig_05f5edd0024f7ab5016a43831771d481978e8c9fb3f28acbd7.png"
+    }
+  ],
+  "prompt": {
+    "use_case": "stylized-concept",
+    "asset_type": "website dashboard hero background for a multiplayer board game",
+    "primary_request": "Create an original elemental companion arena for a Splendor-inspired online board game. Show a polished tabletop arena with glowing gem-like energy tokens in five elements: fire, water, grass, electric, and psychic. Include a few small original fantasy companion silhouettes around the table, but do not resemble or reference any existing Pokemon characters. No logos, no readable text, no watermarks.",
+    "constraints": "Original IP only; no official Pokemon, Splendor, Nintendo, or Asmodee marks; no text; no UI labels."
+  }
+}

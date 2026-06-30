@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "base_path": "assets/splendor-monsters",
+  "assets": {
+    "hero": {
+      "path": "arena-hero.png",
+      "usage": "dashboard_hero",
+      "alt": "Original elemental companion arena"
+    }
+  },
+  "notes": {
+    "semantics": "Display metadata only. Assets do not define game state."
+  }
+}

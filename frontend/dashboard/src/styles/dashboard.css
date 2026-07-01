@@ -708,3 +708,229 @@ label {
     width: 100%;
   }
 }
+
+/* Standard competition table layout. */
+.app {
+  width: min(1680px, calc(100vw - 32px));
+}
+
+.match-panel {
+  min-height: 92px;
+  padding: 14px 18px;
+  align-items: center;
+  background:
+    linear-gradient(90deg, rgba(25, 28, 34, 0.98) 0%, rgba(25, 28, 34, 0.82) 58%, rgba(25, 28, 34, 0.42) 100%),
+    var(--hero-image) center / cover,
+    #242a31;
+}
+
+.match-panel .hero-copy {
+  align-content: center;
+}
+
+.match-panel h2 {
+  font-size: 22px;
+}
+
+.table-layout.standard-table {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.player-rail,
+.table-rail {
+  position: static;
+  max-height: none;
+  overflow: visible;
+}
+
+.player-rail .player-stack {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.standard-field,
+.field-control-stack,
+.field-market-stack,
+.field-side-stack {
+  min-width: 0;
+}
+
+.standard-field .field-board {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) minmax(210px, 245px);
+  gap: 12px;
+  align-items: start;
+}
+
+.field-control-stack,
+.field-market-stack,
+.field-side-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.field-control-stack .bank-panel {
+  display: grid;
+  align-items: stretch;
+}
+
+.field-control-stack .bank-tokens {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field-control-stack .token-button {
+  width: 100%;
+  min-width: 0;
+}
+
+.field-control-stack .bank-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.field-market-stack .market-grid {
+  gap: 12px;
+}
+
+.market-tier .market-lane {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.deck-slot {
+  width: 100%;
+  min-height: 250px;
+  padding: 12px 10px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  border-style: dashed;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    #1a2027;
+  color: #f5f7fb;
+  text-align: center;
+  white-space: normal;
+}
+
+.deck-slot span,
+.deck-slot small {
+  color: #aeb7c4;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.deck-slot strong {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.market-card-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(136px, 1fr));
+  gap: 10px;
+}
+
+.market-card-row .companion-card {
+  width: 100%;
+  min-height: 284px;
+}
+
+.special-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.special-card-slot {
+  width: 100%;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.special-slot-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.deck-count {
+  color: #aeb7c4;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.field-side-stack .mentor-row {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.field-side-stack .mentor,
+.table-rail .companion-card {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1180px) {
+  .standard-field .field-board {
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  }
+
+  .field-side-stack {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .standard-field .field-board,
+  .field-side-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .field-control-stack .bank-tokens {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .market-tier .market-lane {
+    grid-template-columns: 1fr;
+  }
+
+  .deck-slot {
+    min-height: 86px;
+    grid-template-columns: 1fr auto 1fr;
+    align-content: center;
+  }
+
+  .market-card-row {
+    grid-template-columns: repeat(2, minmax(136px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .app {
+    width: min(100vw - 20px, 1680px);
+  }
+
+  .field-control-stack .bank-tokens {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .match-panel h2 {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 560px) {
+  .market-card-row,
+  .deck-slot {
+    grid-template-columns: 1fr;
+  }
+}

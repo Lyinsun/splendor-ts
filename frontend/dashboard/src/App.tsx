@@ -121,7 +121,7 @@ export function App() {
 
       {game.error !== null && <div className="error-banner">{game.error}</div>}
 
-      <section className="hero-panel" aria-label={theme.assets.hero.alt[locale]}>
+      <section className={`hero-panel ${room === null ? 'lobby-hero' : 'match-panel'}`} aria-label={theme.assets.hero.alt[locale]}>
         <div className="hero-copy">
           <p className="eyebrow">{copy.heroEyebrow}</p>
           <h2>{room?.roomName ?? copy.noRoomTitle}</h2>
@@ -289,9 +289,10 @@ function GameTable(props: {
   onBuy: (source: Exclude<CardSource, { kind: 'deck' }>) => void;
 }) {
   const winnerNames = props.room.players.filter((player) => props.room.winnerIds.includes(player.id)).map((player) => player.name).join(', ');
+  const hasBoard = props.room.status !== 'lobby';
   return (
-    <section className="table-layout">
-      <aside className="panel side-panel">
+    <section className="table-layout standard-table">
+      <aside className="panel side-panel player-rail">
         <div className="room-tools">
           <button type="button" className="ghost-button" onClick={() => copyRoomId(props.room.roomId)}>
             <Copy size={16} /> {props.copy.copyRoom}
@@ -333,7 +334,7 @@ function GameTable(props: {
         {props.room.status === 'finished' ? <div className="winner-box">{props.copy.winner}: {winnerNames}</div> : null}
       </aside>
 
-      <section className="play-area">
+      <section className="play-area standard-field">
         <div className="panel turn-panel">
           <div>
             <p className="eyebrow">{props.copy.currentTurn}</p>
@@ -342,76 +343,84 @@ function GameTable(props: {
           <StatusPill label={props.isMyTurn ? props.copy.yourMove : props.copy.watching} tone={props.isMyTurn ? 'good' : 'muted'} />
         </div>
 
-        {props.room.status === 'playing' ? (
-          <>
-            <BankPanel
-              copy={props.copy}
-              locale={props.locale}
-              room={props.room}
-              disabled={!props.isMyTurn || props.busy}
-              tokenSelection={props.tokenSelection}
-              onTokenSelect={props.onTokenSelect}
-              onClearTokens={props.onClearTokens}
-              onTakeTokens={props.onTakeTokens}
-            />
-            <SettlementPanel
-              copy={props.copy}
-              locale={props.locale}
-              room={props.room}
-              player={props.myPlayer}
-              disabled={!props.isMyTurn || props.busy}
-              discardSelection={props.discardSelection}
-              evolutionSelection={props.evolutionSelection}
-              onDiscardSelect={props.onDiscardSelect}
-              onClearDiscard={props.onClearDiscard}
-              onEvolutionSelect={props.onEvolutionSelect}
-            />
-          </>
-        ) : null}
+        {hasBoard ? (
+          <div className="field-board">
+            <div className="field-control-stack">
+              <BankPanel
+                copy={props.copy}
+                locale={props.locale}
+                room={props.room}
+                disabled={!props.isMyTurn || props.busy || props.room.status !== 'playing'}
+                tokenSelection={props.tokenSelection}
+                onTokenSelect={props.onTokenSelect}
+                onClearTokens={props.onClearTokens}
+                onTakeTokens={props.onTakeTokens}
+              />
+              {props.room.status === 'playing' ? (
+                <SettlementPanel
+                  copy={props.copy}
+                  locale={props.locale}
+                  room={props.room}
+                  player={props.myPlayer}
+                  disabled={!props.isMyTurn || props.busy}
+                  discardSelection={props.discardSelection}
+                  evolutionSelection={props.evolutionSelection}
+                  onDiscardSelect={props.onDiscardSelect}
+                  onClearDiscard={props.onClearDiscard}
+                  onEvolutionSelect={props.onEvolutionSelect}
+                />
+              ) : null}
+            </div>
 
-        <div className="market-grid">
-          {[3, 2, 1].map((tier) => (
-            <MarketTier
-              key={tier}
-              copy={props.copy}
-              locale={props.locale}
-              themeId={props.themeId}
-              tier={tier as CardTier}
-              cards={props.room.board.market[tier as CardTier]}
-              deckCount={props.room.board.decks[tier as CardTier].length}
-              disabled={!props.isMyTurn || props.busy || props.room.status !== 'playing'}
-              player={props.myPlayer}
-              onReserve={props.onReserve}
-              onBuy={props.onBuy}
-            />
-          ))}
-        </div>
-
-        <SpecialMarket
-          copy={props.copy}
-          locale={props.locale}
-          themeId={props.themeId}
-          room={props.room}
-          disabled={!props.isMyTurn || props.busy || props.room.status !== 'playing'}
-          player={props.myPlayer}
-          onBuy={props.onBuy}
-        />
-
-        <section className="panel mentor-panel">
-          <h3>{props.copy.gymMentors}</h3>
-          <div className="mentor-row">
-            {props.room.board.gymLeaders.map((leader) => (
-              <div className={`mentor ${tokenClassName(leader.element)}`} key={leader.id}>
-                <strong>{leaderName(leader, props.locale)}</strong>
-                <span>{leader.points} {props.copy.glory}</span>
-                <CostList cost={leader.requirement} />
+            <div className="field-market-stack">
+              <div className="market-grid">
+                {[3, 2, 1].map((tier) => (
+                  <MarketTier
+                    key={tier}
+                    copy={props.copy}
+                    locale={props.locale}
+                    themeId={props.themeId}
+                    tier={tier as CardTier}
+                    cards={props.room.board.market[tier as CardTier]}
+                    deckCount={props.room.board.decks[tier as CardTier].length}
+                    disabled={!props.isMyTurn || props.busy || props.room.status !== 'playing'}
+                    player={props.myPlayer}
+                    onReserve={props.onReserve}
+                    onBuy={props.onBuy}
+                  />
+                ))}
               </div>
-            ))}
+            </div>
+
+            <div className="field-side-stack">
+              <SpecialMarket
+                copy={props.copy}
+                locale={props.locale}
+                themeId={props.themeId}
+                room={props.room}
+                disabled={!props.isMyTurn || props.busy || props.room.status !== 'playing'}
+                player={props.myPlayer}
+                onBuy={props.onBuy}
+              />
+
+              <section className="panel mentor-panel">
+                <h3>{props.copy.gymMentors}</h3>
+                <div className="mentor-row">
+                  {props.room.board.gymLeaders.map((leader) => (
+                    <div className={`mentor ${tokenClassName(leader.element)}`} key={leader.id}>
+                      <strong>{leaderName(leader, props.locale)}</strong>
+                      <span>{leader.points} {props.copy.glory}</span>
+                      <CostList cost={leader.requirement} />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
           </div>
-        </section>
+        ) : null}
       </section>
 
-      <aside className="panel side-panel">
+      <aside className="panel side-panel table-rail">
         <h3>{props.copy.yourReserve}</h3>
         {props.myPlayer?.reserved.length === 0 ? <p className="empty">{props.copy.noReserved}</p> : null}
         {props.myPlayer?.reserved.map((card) => (
@@ -451,30 +460,36 @@ function SpecialMarket(props: {
   onBuy: (source: Exclude<CardSource, { kind: 'deck' }>) => void;
 }) {
   const ranks = ['rare', 'legendary'] satisfies SpecialCardRank[];
-  const visibleCards = ranks.flatMap((rank) => props.room.board.specialMarket[rank].map((card) => ({ rank, card })));
-  if (visibleCards.length === 0) {
+  const hasSpecialCards = ranks.some((rank) => props.room.board.specialMarket[rank].length > 0 || props.room.board.specialDecks[rank].length > 0);
+  if (!hasSpecialCards) {
     return null;
   }
   return (
     <section className="panel special-panel">
       <div className="tier-heading">
         <h3>{props.copy.specialCards}</h3>
-        <span>{visibleCards.length} {props.copy.open}</span>
+        <span>{ranks.reduce((sum, rank) => sum + props.room.board.specialMarket[rank].length, 0)} {props.copy.open}</span>
       </div>
-      <div className="card-row">
-        {visibleCards.map(({ rank, card }) => (
-          <div className="special-card-slot" key={`${rank}-${card.id}`}>
-            <span className="special-rank">{props.copy.specialRank[rank]}</span>
-            <CompanionCardView
-              copy={props.copy}
-              locale={props.locale}
-              themeId={props.themeId}
-              card={card}
-              compact
-              disabled={props.disabled}
-              affordable={props.player === undefined ? false : canAfford(props.player, card)}
-              onBuy={() => props.onBuy({ kind: 'special_market', rank, cardId: card.id })}
-            />
+      <div className="special-grid">
+        {ranks.map((rank) => (
+          <div className="special-card-slot" key={rank}>
+            <div className="special-slot-heading">
+              <span className="special-rank">{props.copy.specialRank[rank]}</span>
+              <span className="deck-count">{props.room.board.specialDecks[rank].length} {props.copy.deck}</span>
+            </div>
+            {props.room.board.specialMarket[rank].map((card) => (
+              <CompanionCardView
+                key={card.id}
+                copy={props.copy}
+                locale={props.locale}
+                themeId={props.themeId}
+                card={card}
+                compact
+                disabled={props.disabled}
+                affordable={props.player === undefined ? false : canAfford(props.player, card)}
+                onBuy={() => props.onBuy({ kind: 'special_market', rank, cardId: card.id })}
+              />
+            ))}
           </div>
         ))}
       </div>
@@ -618,32 +633,35 @@ function MarketTier(props: {
     <section className="panel market-tier">
       <div className="tier-heading">
         <h3>{props.copy.tier} {props.tier}</h3>
-        <div className="tier-tools">
-          <span>{props.cards.length} {props.copy.open}</span>
-          <button
-            type="button"
-            className="ghost-button small-button"
-            disabled={props.disabled || props.deckCount <= 0}
-            onClick={() => props.onReserve({ kind: 'deck', tier: props.tier })}
-          >
-            {props.copy.reserveDeck}
-          </button>
-        </div>
+        <span>{props.cards.length} {props.copy.open}</span>
       </div>
-      <div className="card-row">
-        {props.cards.map((card) => (
-          <CompanionCardView
-            key={card.id}
-            copy={props.copy}
-            locale={props.locale}
-            themeId={props.themeId}
-            card={card}
-            disabled={props.disabled}
-            affordable={props.player === undefined ? false : canAfford(props.player, card)}
-            onReserve={() => props.onReserve({ kind: 'market', tier: props.tier, cardId: card.id })}
-            onBuy={() => props.onBuy({ kind: 'market', tier: props.tier, cardId: card.id })}
-          />
-        ))}
+      <div className="market-lane">
+        <button
+          type="button"
+          className="deck-slot"
+          disabled={props.disabled || props.deckCount <= 0}
+          onClick={() => props.onReserve({ kind: 'deck', tier: props.tier })}
+          title={`${props.copy.reserveDeck} · ${props.copy.tier} ${props.tier}`}
+        >
+          <span>{props.copy.tier} {props.tier}</span>
+          <strong>{props.deckCount}</strong>
+          <small>{props.copy.reserveDeck}</small>
+        </button>
+        <div className="card-row market-card-row">
+          {props.cards.map((card) => (
+            <CompanionCardView
+              key={card.id}
+              copy={props.copy}
+              locale={props.locale}
+              themeId={props.themeId}
+              card={card}
+              disabled={props.disabled}
+              affordable={props.player === undefined ? false : canAfford(props.player, card)}
+              onReserve={() => props.onReserve({ kind: 'market', tier: props.tier, cardId: card.id })}
+              onBuy={() => props.onBuy({ kind: 'market', tier: props.tier, cardId: card.id })}
+            />
+          ))}
+        </div>
       </div>
     </section>
   );

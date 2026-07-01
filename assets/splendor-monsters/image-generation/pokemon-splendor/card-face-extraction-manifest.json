@@ -1,0 +1,609 @@
+{
+  "source": "docs/璀璨宝石宝可梦_A4DIY_有皮卡丘_ver1201.pdf",
+  "cardIdSource": "src/game/domain/content.ts",
+  "renderDpi": 120,
+  "crop": {
+    "x": [
+      40,
+      304,
+      569,
+      833,
+      1098
+    ],
+    "y": [
+      90,
+      497
+    ],
+    "width": 264,
+    "height": 407
+  },
+  "output": {
+    "width": 420,
+    "height": 648,
+    "directory": "assets/splendor-monsters/themes/pokemon-splendor/cards"
+  },
+  "pages": [
+    {
+      "page": 2,
+      "cards": 10
+    },
+    {
+      "page": 4,
+      "cards": 10
+    },
+    {
+      "page": 6,
+      "cards": 10
+    },
+    {
+      "page": 8,
+      "cards": 5
+    },
+    {
+      "page": 10,
+      "cards": 10
+    },
+    {
+      "page": 12,
+      "cards": 10
+    },
+    {
+      "page": 14,
+      "cards": 10
+    },
+    {
+      "page": 16,
+      "cards": 10
+    },
+    {
+      "page": 18,
+      "cards": 5
+    },
+    {
+      "page": 20,
+      "cards": 10
+    }
+  ],
+  "cards": [
+    {
+      "cardId": "pdf-t1-dratini-01",
+      "sourcePage": 2,
+      "sourceSlot": 1,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-dratini-01.png"
+    },
+    {
+      "cardId": "pdf-t1-caterpie-01",
+      "sourcePage": 2,
+      "sourceSlot": 2,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-caterpie-01.png"
+    },
+    {
+      "cardId": "pdf-t1-bulbasaur-01",
+      "sourcePage": 2,
+      "sourceSlot": 3,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-bulbasaur-01.png"
+    },
+    {
+      "cardId": "pdf-t1-charmander-01",
+      "sourcePage": 2,
+      "sourceSlot": 4,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-charmander-01.png"
+    },
+    {
+      "cardId": "pdf-t1-squirtle-01",
+      "sourcePage": 2,
+      "sourceSlot": 5,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-squirtle-01.png"
+    },
+    {
+      "cardId": "pdf-t1-weedle-01",
+      "sourcePage": 2,
+      "sourceSlot": 6,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-weedle-01.png"
+    },
+    {
+      "cardId": "pdf-t1-poliwag-01",
+      "sourcePage": 2,
+      "sourceSlot": 7,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-poliwag-01.png"
+    },
+    {
+      "cardId": "pdf-t1-nidoran-f-01",
+      "sourcePage": 2,
+      "sourceSlot": 8,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-nidoran-f-01.png"
+    },
+    {
+      "cardId": "pdf-t1-pidgey-01",
+      "sourcePage": 2,
+      "sourceSlot": 9,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-pidgey-01.png"
+    },
+    {
+      "cardId": "pdf-t1-machop-01",
+      "sourcePage": 2,
+      "sourceSlot": 10,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-machop-01.png"
+    },
+    {
+      "cardId": "pdf-t1-oddish-01",
+      "sourcePage": 4,
+      "sourceSlot": 1,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-oddish-01.png"
+    },
+    {
+      "cardId": "pdf-t1-abra-01",
+      "sourcePage": 4,
+      "sourceSlot": 2,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-abra-01.png"
+    },
+    {
+      "cardId": "pdf-t1-gastly-01",
+      "sourcePage": 4,
+      "sourceSlot": 3,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-gastly-01.png"
+    },
+    {
+      "cardId": "pdf-t1-geodude-01",
+      "sourcePage": 4,
+      "sourceSlot": 4,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-geodude-01.png"
+    },
+    {
+      "cardId": "pdf-t1-bellsprout-01",
+      "sourcePage": 4,
+      "sourceSlot": 5,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-bellsprout-01.png"
+    },
+    {
+      "cardId": "pdf-t1-bellsprout-02",
+      "sourcePage": 4,
+      "sourceSlot": 6,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-bellsprout-02.png"
+    },
+    {
+      "cardId": "pdf-t1-pidgey-02",
+      "sourcePage": 4,
+      "sourceSlot": 7,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-pidgey-02.png"
+    },
+    {
+      "cardId": "pdf-t1-nidoran-f-02",
+      "sourcePage": 4,
+      "sourceSlot": 8,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-nidoran-f-02.png"
+    },
+    {
+      "cardId": "pdf-t1-poliwag-02",
+      "sourcePage": 4,
+      "sourceSlot": 9,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-poliwag-02.png"
+    },
+    {
+      "cardId": "pdf-t1-machop-02",
+      "sourcePage": 4,
+      "sourceSlot": 10,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-machop-02.png"
+    },
+    {
+      "cardId": "pdf-t1-oddish-02",
+      "sourcePage": 6,
+      "sourceSlot": 1,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-oddish-02.png"
+    },
+    {
+      "cardId": "pdf-t1-abra-02",
+      "sourcePage": 6,
+      "sourceSlot": 2,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-abra-02.png"
+    },
+    {
+      "cardId": "pdf-t1-gastly-02",
+      "sourcePage": 6,
+      "sourceSlot": 3,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-gastly-02.png"
+    },
+    {
+      "cardId": "pdf-t1-geodude-02",
+      "sourcePage": 6,
+      "sourceSlot": 4,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-geodude-02.png"
+    },
+    {
+      "cardId": "pdf-t1-dratini-02",
+      "sourcePage": 6,
+      "sourceSlot": 5,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-dratini-02.png"
+    },
+    {
+      "cardId": "pdf-t1-caterpie-02",
+      "sourcePage": 6,
+      "sourceSlot": 6,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-caterpie-02.png"
+    },
+    {
+      "cardId": "pdf-t1-bulbasaur-02",
+      "sourcePage": 6,
+      "sourceSlot": 7,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-bulbasaur-02.png"
+    },
+    {
+      "cardId": "pdf-t1-charmander-02",
+      "sourcePage": 6,
+      "sourceSlot": 8,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-charmander-02.png"
+    },
+    {
+      "cardId": "pdf-t1-squirtle-02",
+      "sourcePage": 6,
+      "sourceSlot": 9,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-squirtle-02.png"
+    },
+    {
+      "cardId": "pdf-t1-weedle-02",
+      "sourcePage": 6,
+      "sourceSlot": 10,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-weedle-02.png"
+    },
+    {
+      "cardId": "pdf-t1-bellsprout-03",
+      "sourcePage": 8,
+      "sourceSlot": 1,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-bellsprout-03.png"
+    },
+    {
+      "cardId": "pdf-t1-pidgey-03",
+      "sourcePage": 8,
+      "sourceSlot": 2,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-pidgey-03.png"
+    },
+    {
+      "cardId": "pdf-t1-nidoran-f-03",
+      "sourcePage": 8,
+      "sourceSlot": 3,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-nidoran-f-03.png"
+    },
+    {
+      "cardId": "pdf-t1-poliwag-03",
+      "sourcePage": 8,
+      "sourceSlot": 4,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-poliwag-03.png"
+    },
+    {
+      "cardId": "pdf-t1-oddish-03",
+      "sourcePage": 8,
+      "sourceSlot": 5,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t1-oddish-03.png"
+    },
+    {
+      "cardId": "pdf-t2-dragonair-01",
+      "sourcePage": 10,
+      "sourceSlot": 1,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-dragonair-01.png"
+    },
+    {
+      "cardId": "pdf-t2-metapod-01",
+      "sourcePage": 10,
+      "sourceSlot": 2,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-metapod-01.png"
+    },
+    {
+      "cardId": "pdf-t2-ivysaur-01",
+      "sourcePage": 10,
+      "sourceSlot": 3,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-ivysaur-01.png"
+    },
+    {
+      "cardId": "pdf-t2-charmeleon-01",
+      "sourcePage": 10,
+      "sourceSlot": 4,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-charmeleon-01.png"
+    },
+    {
+      "cardId": "pdf-t2-wartortle-01",
+      "sourcePage": 10,
+      "sourceSlot": 5,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-wartortle-01.png"
+    },
+    {
+      "cardId": "pdf-t2-kakuna-01",
+      "sourcePage": 10,
+      "sourceSlot": 6,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-kakuna-01.png"
+    },
+    {
+      "cardId": "pdf-t2-poliwhirl-01",
+      "sourcePage": 10,
+      "sourceSlot": 7,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-poliwhirl-01.png"
+    },
+    {
+      "cardId": "pdf-t2-nidorina-01",
+      "sourcePage": 10,
+      "sourceSlot": 8,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-nidorina-01.png"
+    },
+    {
+      "cardId": "pdf-t2-pidgeotto-01",
+      "sourcePage": 10,
+      "sourceSlot": 9,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-pidgeotto-01.png"
+    },
+    {
+      "cardId": "pdf-t2-machoke-01",
+      "sourcePage": 10,
+      "sourceSlot": 10,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-machoke-01.png"
+    },
+    {
+      "cardId": "pdf-t2-gloom-01",
+      "sourcePage": 12,
+      "sourceSlot": 1,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-gloom-01.png"
+    },
+    {
+      "cardId": "pdf-t2-kadabra-01",
+      "sourcePage": 12,
+      "sourceSlot": 2,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-kadabra-01.png"
+    },
+    {
+      "cardId": "pdf-t2-haunter-01",
+      "sourcePage": 12,
+      "sourceSlot": 3,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-haunter-01.png"
+    },
+    {
+      "cardId": "pdf-t2-graveler-01",
+      "sourcePage": 12,
+      "sourceSlot": 4,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-graveler-01.png"
+    },
+    {
+      "cardId": "pdf-t2-weepinbell-01",
+      "sourcePage": 12,
+      "sourceSlot": 5,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-weepinbell-01.png"
+    },
+    {
+      "cardId": "pdf-t2-dragonair-02",
+      "sourcePage": 12,
+      "sourceSlot": 6,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-dragonair-02.png"
+    },
+    {
+      "cardId": "pdf-t2-metapod-02",
+      "sourcePage": 12,
+      "sourceSlot": 7,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-metapod-02.png"
+    },
+    {
+      "cardId": "pdf-t2-ivysaur-02",
+      "sourcePage": 12,
+      "sourceSlot": 8,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-ivysaur-02.png"
+    },
+    {
+      "cardId": "pdf-t2-charmeleon-02",
+      "sourcePage": 12,
+      "sourceSlot": 9,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-charmeleon-02.png"
+    },
+    {
+      "cardId": "pdf-t2-wartortle-02",
+      "sourcePage": 12,
+      "sourceSlot": 10,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-wartortle-02.png"
+    },
+    {
+      "cardId": "pdf-t2-kakuna-02",
+      "sourcePage": 14,
+      "sourceSlot": 1,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-kakuna-02.png"
+    },
+    {
+      "cardId": "pdf-t2-poliwhirl-02",
+      "sourcePage": 14,
+      "sourceSlot": 2,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-poliwhirl-02.png"
+    },
+    {
+      "cardId": "pdf-t2-nidorina-02",
+      "sourcePage": 14,
+      "sourceSlot": 3,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-nidorina-02.png"
+    },
+    {
+      "cardId": "pdf-t2-pidgeotto-02",
+      "sourcePage": 14,
+      "sourceSlot": 4,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-pidgeotto-02.png"
+    },
+    {
+      "cardId": "pdf-t2-machoke-02",
+      "sourcePage": 14,
+      "sourceSlot": 5,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-machoke-02.png"
+    },
+    {
+      "cardId": "pdf-t2-kadabra-02",
+      "sourcePage": 14,
+      "sourceSlot": 6,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-kadabra-02.png"
+    },
+    {
+      "cardId": "pdf-t2-haunter-02",
+      "sourcePage": 14,
+      "sourceSlot": 7,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-haunter-02.png"
+    },
+    {
+      "cardId": "pdf-t2-graveler-02",
+      "sourcePage": 14,
+      "sourceSlot": 8,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-graveler-02.png"
+    },
+    {
+      "cardId": "pdf-t2-weepinbell-02",
+      "sourcePage": 14,
+      "sourceSlot": 9,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-weepinbell-02.png"
+    },
+    {
+      "cardId": "pdf-t2-gloom-02",
+      "sourcePage": 14,
+      "sourceSlot": 10,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t2-gloom-02.png"
+    },
+    {
+      "cardId": "pdf-t3-dragonite-01",
+      "sourcePage": 16,
+      "sourceSlot": 1,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-dragonite-01.png"
+    },
+    {
+      "cardId": "pdf-t3-butterfree-01",
+      "sourcePage": 16,
+      "sourceSlot": 2,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-butterfree-01.png"
+    },
+    {
+      "cardId": "pdf-t3-venusaur-01",
+      "sourcePage": 16,
+      "sourceSlot": 3,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-venusaur-01.png"
+    },
+    {
+      "cardId": "pdf-t3-charizard-01",
+      "sourcePage": 16,
+      "sourceSlot": 4,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-charizard-01.png"
+    },
+    {
+      "cardId": "pdf-t3-blastoise-01",
+      "sourcePage": 16,
+      "sourceSlot": 5,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-blastoise-01.png"
+    },
+    {
+      "cardId": "pdf-t3-beedrill-01",
+      "sourcePage": 16,
+      "sourceSlot": 6,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-beedrill-01.png"
+    },
+    {
+      "cardId": "pdf-t3-poliwrath-01",
+      "sourcePage": 16,
+      "sourceSlot": 7,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-poliwrath-01.png"
+    },
+    {
+      "cardId": "pdf-t3-nidoqueen-01",
+      "sourcePage": 16,
+      "sourceSlot": 8,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-nidoqueen-01.png"
+    },
+    {
+      "cardId": "pdf-t3-pidgeot-01",
+      "sourcePage": 16,
+      "sourceSlot": 9,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-pidgeot-01.png"
+    },
+    {
+      "cardId": "pdf-t3-machamp-01",
+      "sourcePage": 16,
+      "sourceSlot": 10,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-machamp-01.png"
+    },
+    {
+      "cardId": "pdf-t3-vileplume-01",
+      "sourcePage": 18,
+      "sourceSlot": 1,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-vileplume-01.png"
+    },
+    {
+      "cardId": "pdf-t3-alakazam-01",
+      "sourcePage": 18,
+      "sourceSlot": 2,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-alakazam-01.png"
+    },
+    {
+      "cardId": "pdf-t3-gengar-01",
+      "sourcePage": 18,
+      "sourceSlot": 3,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-gengar-01.png"
+    },
+    {
+      "cardId": "pdf-t3-golem-01",
+      "sourcePage": 18,
+      "sourceSlot": 4,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-golem-01.png"
+    },
+    {
+      "cardId": "pdf-t3-victreebel-01",
+      "sourcePage": 18,
+      "sourceSlot": 5,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-t3-victreebel-01.png"
+    },
+    {
+      "cardId": "pdf-rare-eevee",
+      "sourcePage": 20,
+      "sourceSlot": 1,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-rare-eevee.png"
+    },
+    {
+      "cardId": "pdf-rare-snorlax",
+      "sourcePage": 20,
+      "sourceSlot": 2,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-rare-snorlax.png"
+    },
+    {
+      "cardId": "pdf-rare-aerodactyl",
+      "sourcePage": 20,
+      "sourceSlot": 3,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-rare-aerodactyl.png"
+    },
+    {
+      "cardId": "pdf-rare-ditto",
+      "sourcePage": 20,
+      "sourceSlot": 4,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-rare-ditto.png"
+    },
+    {
+      "cardId": "pdf-rare-lapras",
+      "sourcePage": 20,
+      "sourceSlot": 5,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-rare-lapras.png"
+    },
+    {
+      "cardId": "pdf-legendary-mewtwo",
+      "sourcePage": 20,
+      "sourceSlot": 6,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-legendary-mewtwo.png"
+    },
+    {
+      "cardId": "pdf-legendary-moltres",
+      "sourcePage": 20,
+      "sourceSlot": 7,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-legendary-moltres.png"
+    },
+    {
+      "cardId": "pdf-legendary-articuno",
+      "sourcePage": 20,
+      "sourceSlot": 8,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-legendary-articuno.png"
+    },
+    {
+      "cardId": "pdf-legendary-mew",
+      "sourcePage": 20,
+      "sourceSlot": 9,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-legendary-mew.png"
+    },
+    {
+      "cardId": "pdf-legendary-zapdos",
+      "sourcePage": 20,
+      "sourceSlot": 10,
+      "path": "assets/splendor-monsters/themes/pokemon-splendor/cards/pdf-legendary-zapdos.png"
+    }
+  ]
+}

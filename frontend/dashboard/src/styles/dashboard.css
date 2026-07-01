@@ -511,6 +511,10 @@ label {
   grid-template-rows: 96px 1fr auto;
 }
 
+.card-face-card {
+  grid-template-rows: auto 1fr auto;
+}
+
 .card-art {
   min-width: 0;
   overflow: hidden;
@@ -524,6 +528,15 @@ label {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.card-face-art {
+  aspect-ratio: 420 / 648;
+  background: #14181d;
+}
+
+.card-face-art img {
+  object-fit: contain;
 }
 
 .card-art span {

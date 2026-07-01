@@ -20,7 +20,8 @@ export interface ThemeDefinition {
     };
     cardArt?: {
       basePath: string;
-      strategy: 'element-tier';
+      strategy: 'element-tier' | 'card-id';
+      mode?: 'illustration' | 'card-face';
     };
   };
 }
@@ -53,6 +54,11 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
           'zh-CN': '宝可梦璀璨宝石卡牌预览',
           'en-US': 'Pokemon Splendor card preview',
         },
+      },
+      cardArt: {
+        basePath: '/assets/splendor-monsters/themes/pokemon-splendor/cards',
+        strategy: 'card-id',
+        mode: 'card-face',
       },
     },
   },
@@ -457,15 +463,17 @@ export function cardText(card: CompanionCard, locale: Locale, themeId: ThemeId =
   };
 }
 
-export function cardArt(card: CompanionCard, locale: Locale, themeId: ThemeId): { src: string; alt: string } | null {
+export function cardArt(card: CompanionCard, locale: Locale, themeId: ThemeId): { src: string; alt: string; mode: 'illustration' | 'card-face' } | null {
   const art = THEMES[themeId].assets.cardArt;
   if (art === undefined) {
     return null;
   }
   const text = cardText(card, locale, themeId);
+  const filename = art.strategy === 'card-id' ? `${card.id}.png` : `${card.element}-t${card.tier}.png`;
   return {
-    src: `${art.basePath}/${card.element}-t${card.tier}.png`,
+    src: `${art.basePath}/${filename}`,
     alt: locale === 'zh-CN' ? `${text.name} 卡牌插画` : `${text.name} card art`,
+    mode: art.mode ?? 'illustration',
   };
 }
 

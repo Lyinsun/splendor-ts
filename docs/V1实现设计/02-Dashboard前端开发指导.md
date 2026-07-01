@@ -57,15 +57,21 @@ assets/splendor-monsters/
         fire-t1.png
         fire-t2.png
         ...
+    pokemon-splendor/
+      arena-hero.png
+      cards/
+        pdf-t1-dratini-01.png
+        pdf-rare-eevee.png
+        ...
   image-generation/
     <theme-id>/
       arena-hero-manifest.json
       card-art-manifest.json
 ```
 
-卡图路径约定为 `cards/<element>-t<tier>.png`。前端只能把它作为 `CompanionCard` 的展示资源来读取，不允许让图片目录决定卡牌是否存在、费用、分数或回合结果。
+卡图支持两种展示策略：原创主题可使用 `cards/<element>-t<tier>.png`，授权 Pokémon 主题使用 `cards/<card-id>.png` 对应 PDF 实体卡面。前端只能把卡图作为 `CompanionCard` 的展示资源来读取，不允许让图片目录决定卡牌是否存在、费用、分数或回合结果。
 
-授权 Pokémon 主题若采用逐卡素材，可以新增 `cards/<card-id>.png` 或 manifest 映射，但仍必须由服务端 `CompanionCard.id` 驱动渲染，不能让素材文件反向创建卡牌事实。
+授权 Pokémon 主题的逐卡素材必须由服务端 `CompanionCard.id` 驱动渲染，不能让素材文件反向创建卡牌事实。PDF 卡面抽取脚本为 `scripts/extract-pokemon-card-assets.py`，抽取 manifest 位于 `assets/splendor-monsters/image-generation/pokemon-splendor/card-face-extraction-manifest.json`。
 
 ## 六、验证
 

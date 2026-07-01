@@ -83,8 +83,9 @@ Joom 商品页列出组件为：
 ## 当前实现状态
 
 - `src/game/domain/content.ts` 已按本地规则资料的组件规模落地 90 张卡：1 级 35 张、2 级 30 张、3 级 15 张、罕见 5 张、传说 5 张。
-- 当前卡组是可玩的 Pokémon 版核心卡表：使用授权 Pokémon 名称、真实进化链和特殊卡区结构；费用、分值和 bonus 分配是工程先行的平衡版本，尚未逐张 OCR/人工校准为 PDF 原卡面数值。
+- 当前卡组是可玩的 Pokémon 版核心卡表：使用授权 Pokémon 名称、真实进化链和特殊卡区结构；费用、分值和 bonus 已按 PDF 卡面做首轮人工视觉抽取，尚未做第二人复核或 OCR 交叉校验。
 - 实体 PDF 卡表存在同名宝可梦多张卡的情况。领域模型已支持唯一 `id` 加共享 `pokemonId`，并支持按源卡 `evolvesTo` 记录卡面进化要求；抽取过程记录在 `docs/research/2026-07-01-pokemon-card-extraction.md`。
+- Dashboard 已按 `CompanionCard.id` 使用 PDF 正面裁图，卡面资源位于 `assets/splendor-monsters/themes/pokemon-splendor/cards/<card-id>.png`，仍只作为展示元数据。
 - `applyGameAction` 仍是结算边界。进化不作为独立主行动暴露，而是作为 `take_tokens` / `reserve_card` / `buy_card` 的可选 `evolution` 参数，在主行动、补牌、弃球之后结算。
 - 罕见和传说卡不能保留，只能从 `special_market` 捕获；捕获时需要 `prism`，并提供 2 个 bonus。
 - Dashboard 已暴露主行动附加结算：玩家可以预选公开弃球、选择 1 次可选进化，也可以保留 1/2/3 级牌堆顶。前端只提交意图，合法性仍由领域层校验。

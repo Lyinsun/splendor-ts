@@ -643,9 +643,11 @@ function CompanionCardView(props: {
   const text = cardText(props.card, props.locale, props.themeId);
   const art = cardArt(props.card, props.locale, props.themeId);
   const flavor = cardFlavor(props.card, props.locale, props.themeId);
+  const cardFaceClass = art?.mode === 'card-face' ? 'card-face-card' : '';
+  const cardArtClass = art?.mode === 'card-face' ? 'card-face-art' : '';
   return (
-    <article className={`companion-card ${tokenClassName(props.card.element)} ${props.compact === true ? 'compact-card' : ''}`}>
-      <div className="card-art">
+    <article className={`companion-card ${tokenClassName(props.card.element)} ${props.compact === true ? 'compact-card' : ''} ${cardFaceClass}`}>
+      <div className={`card-art ${cardArtClass}`}>
         {art === null ? <span>{text.species.slice(0, 1)}</span> : <img src={art.src} alt={art.alt} loading="lazy" />}
       </div>
       <div className="card-body">

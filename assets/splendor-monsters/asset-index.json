@@ -17,6 +17,16 @@
             "en-US": "Pokemon Splendor card preview"
           },
           "source": "docs/璀璨宝石宝可梦_A4DIY_有皮卡丘_ver1201.pdf page 2 crop"
+        },
+        "card_art": {
+          "strategy": "card-id",
+          "base_path": "themes/pokemon-splendor/cards",
+          "usage": "dashboard_companion_card_face",
+          "source": "docs/璀璨宝石宝可梦_A4DIY_有皮卡丘_ver1201.pdf pages 2/4/6/8/10/12/14/16/18/20",
+          "manifest": {
+            "path": "image-generation/pokemon-splendor/card-face-extraction-manifest.json",
+            "usage": "card_face_extraction_manifest"
+          }
         }
       }
     },

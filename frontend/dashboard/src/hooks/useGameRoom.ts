@@ -4,6 +4,7 @@ import type { ActionOptions, CardSource, GameState, RoomSummary, TokenKind } fro
 
 const ROOM_KEY = 'splendor-monsters-room-id';
 const PLAYER_KEY = 'splendor-monsters-player-id';
+const LOCAL_PLAYERS_KEY = 'splendor-monsters-local-player-ids';
 const NAME_KEY = 'splendor-monsters-player-name';
 
 interface WsMessage {
@@ -16,15 +17,47 @@ export function useGameRoom() {
   const [room, setRoom] = useState<GameState | null>(null);
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [playerId, setPlayerId] = useState<string>(() => localStorage.getItem(PLAYER_KEY) ?? '');
+  const [localPlayerIds, setLocalPlayerIds] = useState<string[]>(readLocalPlayerIds);
   const [playerName, setPlayerName] = useState<string>(() => localStorage.getItem(NAME_KEY) ?? 'Trainer');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [connected, setConnected] = useState(false);
 
   const currentPlayer = useMemo(() => room?.players.find((player) => player.id === playerId), [playerId, room]);
+  const localPlayers = useMemo(() => room?.players.filter((player) => localPlayerIds.includes(player.id)) ?? [], [localPlayerIds, room]);
   const activePlayer = useMemo(() => room?.players.find((player) => player.id === room.currentPlayerId), [room]);
   const isMyTurn = room?.status === 'playing' && room.currentPlayerId === playerId;
-  const isHost = room?.hostPlayerId === playerId;
+  const isHost = room?.hostPlayerId !== null && room?.hostPlayerId !== undefined && localPlayerIds.includes(room.hostPlayerId);
+
+  const setControlledPlayerId = useCallback((nextPlayerId: string) => {
+    setPlayerId(nextPlayerId);
+    if (nextPlayerId === '') {
+      localStorage.removeItem(PLAYER_KEY);
+    } else {
+      localStorage.setItem(PLAYER_KEY, nextPlayerId);
+    }
+  }, []);
+
+  const replaceLocalPlayerIds = useCallback((nextPlayerIds: string[]) => {
+    const normalized = unique(nextPlayerIds);
+    setLocalPlayerIds(normalized);
+    writeLocalPlayerIds(normalized);
+  }, []);
+
+  const rememberLocalPlayerId = useCallback((nextPlayerId: string) => {
+    setLocalPlayerIds((current) => {
+      const next = unique([...current, nextPlayerId]);
+      writeLocalPlayerIds(next);
+      return next;
+    });
+  }, []);
+
+  const selectPlayer = useCallback((nextPlayerId: string) => {
+    if (room === null || !localPlayerIds.includes(nextPlayerId) || !room.players.some((player) => player.id === nextPlayerId)) {
+      return;
+    }
+    setControlledPlayerId(nextPlayerId);
+  }, [localPlayerIds, room, setControlledPlayerId]);
 
   const refreshRooms = useCallback(async () => {
     try {
@@ -40,13 +73,45 @@ export function useGameRoom() {
       return;
     }
     try {
-      setRoom(await gameApi.getRoom(storedRoomId));
+      const restoredRoom = await gameApi.getRoom(storedRoomId);
+      setRoom(restoredRoom);
     } catch {
       localStorage.removeItem(ROOM_KEY);
       localStorage.removeItem(PLAYER_KEY);
+      localStorage.removeItem(LOCAL_PLAYERS_KEY);
       setPlayerId('');
+      setLocalPlayerIds([]);
     }
   }, []);
+
+  useEffect(() => {
+    if (room === null) {
+      return;
+    }
+    const roomPlayerIds = room.players.map((player) => player.id);
+    setLocalPlayerIds((current) => {
+      const migrated = playerId !== '' && roomPlayerIds.includes(playerId) ? [...current, playerId] : current;
+      const next = unique(migrated).filter((id) => roomPlayerIds.includes(id));
+      if (sameIds(current, next)) {
+        return current;
+      }
+      writeLocalPlayerIds(next);
+      return next;
+    });
+  }, [playerId, room]);
+
+  useEffect(() => {
+    if (room === null) {
+      return;
+    }
+    const roomPlayerIds = room.players.map((player) => player.id);
+    const localRoomPlayerIds = localPlayerIds.filter((id) => roomPlayerIds.includes(id));
+    const activeLocalPlayerId = room.currentPlayerId !== null && localRoomPlayerIds.includes(room.currentPlayerId) ? room.currentPlayerId : null;
+    const nextPlayerId = activeLocalPlayerId ?? (localRoomPlayerIds.includes(playerId) ? playerId : localRoomPlayerIds[0] ?? '');
+    if (nextPlayerId !== playerId) {
+      setControlledPlayerId(nextPlayerId);
+    }
+  }, [localPlayerIds, playerId, room, setControlledPlayerId]);
 
   useEffect(() => {
     void refreshRooms();
@@ -97,39 +162,46 @@ export function useGameRoom() {
     setPlayerName(input.playerName);
     await run(() => gameApi.createRoom(input), (result) => {
       setRoom(result.room);
-      setPlayerId(result.playerId);
+      setControlledPlayerId(result.playerId);
+      replaceLocalPlayerIds([result.playerId]);
       localStorage.setItem(ROOM_KEY, result.room.roomId);
-      localStorage.setItem(PLAYER_KEY, result.playerId);
     });
-  }, [run]);
+  }, [replaceLocalPlayerIds, run, setControlledPlayerId]);
 
   const joinRoom = useCallback(async (roomId: string, name = playerName) => {
     localStorage.setItem(NAME_KEY, name);
     setPlayerName(name);
     await run(() => gameApi.joinRoom(roomId, name), (result) => {
       setRoom(result.room);
-      setPlayerId(result.playerId);
+      setControlledPlayerId(result.playerId);
+      replaceLocalPlayerIds([result.playerId]);
       localStorage.setItem(ROOM_KEY, result.room.roomId);
-      localStorage.setItem(PLAYER_KEY, result.playerId);
     });
-  }, [playerName, run]);
+  }, [playerName, replaceLocalPlayerIds, run, setControlledPlayerId]);
 
   const leaveLocalRoom = useCallback(() => {
     localStorage.removeItem(ROOM_KEY);
     localStorage.removeItem(PLAYER_KEY);
+    localStorage.removeItem(LOCAL_PLAYERS_KEY);
     setRoom(null);
     setPlayerId('');
+    setLocalPlayerIds([]);
   }, []);
 
   const startRoom = useCallback(async () => {
-    if (room === null || playerId === '') return;
-    await run(() => gameApi.startRoom(room.roomId, playerId), setRoom);
-  }, [playerId, room, run]);
+    if (room === null || room.hostPlayerId === null || !localPlayerIds.includes(room.hostPlayerId)) return;
+    const hostPlayerId = room.hostPlayerId;
+    await run(() => gameApi.startRoom(room.roomId, hostPlayerId), setRoom);
+  }, [localPlayerIds, room, run]);
 
   const addDemoPlayer = useCallback(async () => {
     if (room === null) return;
-    await run(() => gameApi.addDemoPlayer(room.roomId), (result) => setRoom(result.room));
-  }, [room, run]);
+    await run(() => gameApi.addDemoPlayer(room.roomId), (result) => {
+      setRoom(result.room);
+      rememberLocalPlayerId(result.playerId);
+      setControlledPlayerId(result.playerId);
+    });
+  }, [rememberLocalPlayerId, room, run, setControlledPlayerId]);
 
   const takeTokens = useCallback(async (tokens: TokenKind[], options: ActionOptions = {}) => {
     if (room === null || playerId === '') return null;
@@ -150,8 +222,10 @@ export function useGameRoom() {
     room,
     rooms,
     playerId,
+    localPlayerIds,
     playerName,
     currentPlayer,
+    localPlayers,
     activePlayer,
     isMyTurn,
     isHost,
@@ -159,6 +233,7 @@ export function useGameRoom() {
     error,
     connected,
     setPlayerName,
+    selectPlayer,
     refreshRooms,
     createRoom,
     joinRoom,
@@ -169,6 +244,36 @@ export function useGameRoom() {
     reserveCard,
     buyCard,
   };
+}
+
+function readLocalPlayerIds(): string[] {
+  const raw = localStorage.getItem(LOCAL_PLAYERS_KEY);
+  if (raw === null) {
+    const legacyPlayerId = localStorage.getItem(PLAYER_KEY);
+    return legacyPlayerId === null ? [] : [legacyPlayerId];
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? unique(parsed.filter((id): id is string => typeof id === 'string')) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalPlayerIds(playerIds: string[]): void {
+  if (playerIds.length === 0) {
+    localStorage.removeItem(LOCAL_PLAYERS_KEY);
+    return;
+  }
+  localStorage.setItem(LOCAL_PLAYERS_KEY, JSON.stringify(unique(playerIds)));
+}
+
+function unique(playerIds: string[]): string[] {
+  return [...new Set(playerIds.filter((id) => id.length > 0))];
+}
+
+function sameIds(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function errorMessage(error: unknown): string {

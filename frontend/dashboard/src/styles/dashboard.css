@@ -369,6 +369,30 @@ label {
   gap: 9px;
 }
 
+.control-seat {
+  display: grid;
+  gap: 6px;
+}
+
+.control-seat span {
+  color: rgba(245, 247, 251, 0.72);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.control-seat select {
+  width: 100%;
+}
+
+.player-panel.local {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.player-panel.controlled {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, rgba(255, 255, 255, 0.04));
+}
+
 .player-panel.active {
   border-color: var(--active-border);
 }

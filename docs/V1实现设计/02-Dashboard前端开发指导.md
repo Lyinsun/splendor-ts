@@ -38,6 +38,7 @@ flowchart TD
 - 视觉资产应展示真实项目主题；授权 Pokémon 资产可使用，范围以 `docs/license-scope.md` 为准。
 - `zh-CN` 与 `en-US` 都必须能渲染主要 UI 文案、元素标签、卡牌显示名和导师显示名。
 - 主题化卡牌文案应放在 `frontend/dashboard/src/presentation/`，例如 `creatureAcademy.ts`；不得写入服务端领域卡牌事实。
+- Dashboard 支持本地同屏多人：浏览器可以记录多个本地可控 `playerId`，通过控制席位切换当前操作对象；该状态只影响提交动作时携带哪个 `playerId`，不改变服务端回合规则。
 - 新增主题时同步更新 `asset-index.json`、`frontend/dashboard/src/presentation/themes.ts` 和对应 `image-generation/<theme-id>/` manifest。
 
 ## 五、资源结构

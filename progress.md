@@ -72,3 +72,8 @@
 
 - Optional second-person review of all 90 extracted PDF card rows, especially special-card ordinary costs versus Master Ball requirements.
 - Wire an LLM player on top of `GET /legal-actions`, with the model selecting from server-validated action candidates instead of inferring rules from raw state alone.
+
+## 2026-07-01 Local Play Dashboard Slice
+
+- Changed the Dashboard demo-player flow into a local play mode: added local controllable seat tracking, a control-seat selector, and automatic switching when the active turn belongs to a locally controllable player.
+- Kept server authority unchanged. The browser only chooses which local `playerId` to submit; `applyGameAction` still validates turn ownership and rules.

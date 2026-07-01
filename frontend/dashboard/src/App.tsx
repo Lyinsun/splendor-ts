@@ -157,6 +157,7 @@ export function App() {
           room={room}
           myPlayer={myPlayer}
           playerId={game.playerId}
+          localPlayerIds={game.localPlayerIds}
           busy={game.busy}
           isHost={game.isHost}
           isMyTurn={game.isMyTurn}
@@ -172,6 +173,7 @@ export function App() {
           onTakeTokens={() => void handleTakeTokens()}
           onStart={() => void game.startRoom()}
           onAddDemoPlayer={() => void game.addDemoPlayer()}
+          onControlPlayer={game.selectPlayer}
           onLeave={game.leaveLocalRoom}
           onReserve={(source) => void handleReserve(source)}
           onBuy={(source) => void handleBuy(source)}
@@ -265,6 +267,7 @@ function GameTable(props: {
   room: GameState;
   myPlayer: PlayerState | undefined;
   playerId: string;
+  localPlayerIds: string[];
   busy: boolean;
   isHost: boolean;
   isMyTurn: boolean;
@@ -280,6 +283,7 @@ function GameTable(props: {
   onTakeTokens: () => void;
   onStart: () => void;
   onAddDemoPlayer: () => void;
+  onControlPlayer: (playerId: string) => void;
   onLeave: () => void;
   onReserve: (source: Extract<CardSource, { kind: 'market' | 'deck' }>) => void;
   onBuy: (source: Exclude<CardSource, { kind: 'deck' }>) => void;
@@ -295,9 +299,25 @@ function GameTable(props: {
           <button type="button" className="ghost-button" onClick={props.onLeave}>{props.copy.leave}</button>
         </div>
         <h3>{props.copy.trainers}</h3>
+        <label className="control-seat">
+          <span>{props.copy.controlSeat}</span>
+          <select value={props.playerId} disabled={props.busy || props.localPlayerIds.length === 0} onChange={(event) => props.onControlPlayer(event.target.value)}>
+            {props.room.players.filter((player) => props.localPlayerIds.includes(player.id)).map((player) => (
+              <option value={player.id} key={player.id}>{player.name}</option>
+            ))}
+          </select>
+        </label>
         <div className="player-stack">
           {props.room.players.map((player) => (
-            <PlayerPanel key={player.id} copy={props.copy} locale={props.locale} player={player} active={props.room.currentPlayerId === player.id} mine={props.playerId === player.id} />
+            <PlayerPanel
+              key={player.id}
+              copy={props.copy}
+              locale={props.locale}
+              player={player}
+              active={props.room.currentPlayerId === player.id}
+              controlled={props.playerId === player.id}
+              local={props.localPlayerIds.includes(player.id)}
+            />
           ))}
         </div>
         {props.room.status === 'lobby' ? (
@@ -667,11 +687,12 @@ function CompanionCardView(props: {
   );
 }
 
-function PlayerPanel(props: { copy: AppCopy; locale: Locale; player: PlayerState; active: boolean; mine: boolean }) {
+function PlayerPanel(props: { copy: AppCopy; locale: Locale; player: PlayerState; active: boolean; controlled: boolean; local: boolean }) {
+  const badge = props.controlled ? props.copy.controlled : props.local ? props.copy.localSeat : null;
   return (
-    <article className={`player-panel ${props.active ? 'active' : ''}`}>
+    <article className={`player-panel ${props.active ? 'active' : ''} ${props.controlled ? 'controlled' : ''} ${props.local ? 'local' : ''}`}>
       <div className="player-heading">
-        <strong>{props.player.name}{props.mine ? ` · ${props.copy.you}` : ''}</strong>
+        <strong>{props.player.name}{badge === null ? '' : ` · ${badge}`}</strong>
         <span>{props.player.score} {props.copy.glory}</span>
       </div>
       <div className="bonus-row">

@@ -53,6 +53,7 @@
 - 主题资源以 `assets/splendor-monsters/themes/<theme-id>/` 分割，当前包含 `pokemon-splendor`、`elemental-league`、`crystal-observatory` 与 `creature-academy`。
 - `frontend/dashboard/src/presentation/themes.ts` 负责把服务端稳定 id 映射为语言文案和主题资源路径。
 - `pokemon-splendor` 使用授权 PDF 卡面逐卡素材，路径由 `CompanionCard.id` 派生；`creature-academy` 仍保留为原创展示主题。所有主题仍必须由服务端稳定 id 和领域卡表决定规则事实。
+- Dashboard 支持本地同屏多人模式。添加的本地玩家会被记录为当前浏览器可控座位，用户可以在同一台电脑上切换控制不同玩家；动作提交后仍由服务端 `applyGameAction` 校验当前回合与规则。
 - `locale` 与 `themeId` 只影响显示，不改变服务端规则、卡牌 id、分数、回合或胜者。
 
 ## MVP 非目标

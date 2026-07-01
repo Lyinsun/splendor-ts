@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiError, gameApi } from '../api/client';
-import type { CardSource, GameState, RoomSummary, TokenKind } from '../api/types';
+import type { ActionOptions, CardSource, GameState, RoomSummary, TokenKind } from '../api/types';
 
 const ROOM_KEY = 'splendor-monsters-room-id';
 const PLAYER_KEY = 'splendor-monsters-player-id';
@@ -131,19 +131,19 @@ export function useGameRoom() {
     await run(() => gameApi.addDemoPlayer(room.roomId), (result) => setRoom(result.room));
   }, [room, run]);
 
-  const takeTokens = useCallback(async (tokens: TokenKind[]) => {
-    if (room === null || playerId === '') return;
-    await run(() => gameApi.takeTokens(room.roomId, playerId, tokens), setRoom);
+  const takeTokens = useCallback(async (tokens: TokenKind[], options: ActionOptions = {}) => {
+    if (room === null || playerId === '') return null;
+    return await run(() => gameApi.takeTokens(room.roomId, playerId, tokens, options), setRoom);
   }, [playerId, room, run]);
 
-  const reserveCard = useCallback(async (source: Extract<CardSource, { kind: 'market' }>) => {
-    if (room === null || playerId === '') return;
-    await run(() => gameApi.reserveCard(room.roomId, playerId, source), setRoom);
+  const reserveCard = useCallback(async (source: Extract<CardSource, { kind: 'market' | 'deck' }>, options: ActionOptions = {}) => {
+    if (room === null || playerId === '') return null;
+    return await run(() => gameApi.reserveCard(room.roomId, playerId, source, options), setRoom);
   }, [playerId, room, run]);
 
-  const buyCard = useCallback(async (source: CardSource) => {
-    if (room === null || playerId === '') return;
-    await run(() => gameApi.buyCard(room.roomId, playerId, source), setRoom);
+  const buyCard = useCallback(async (source: Exclude<CardSource, { kind: 'deck' }>, options: ActionOptions = {}) => {
+    if (room === null || playerId === '') return null;
+    return await run(() => gameApi.buyCard(room.roomId, playerId, source, options), setRoom);
   }, [playerId, room, run]);
 
   return {

@@ -1,4 +1,4 @@
-import type { CardSource, GameState, RoomSummary, TokenKind } from './types';
+import type { ActionOptions, CardSource, GameState, LegalGameActionList, RoomSummary, TokenKind } from './types';
 
 export class ApiError extends Error {
   constructor(
@@ -19,6 +19,7 @@ export const gameApi = {
       body: payload,
     }),
   getRoom: (roomId: string) => request<GameState>(`/v1/rooms/${roomId}`),
+  listLegalActions: (roomId: string, playerId: string) => request<LegalGameActionList>(`/v1/rooms/${roomId}/players/${playerId}/legal-actions`),
   joinRoom: (roomId: string, playerName: string) =>
     request<{ room: GameState; playerId: string }>(`/v1/rooms/${roomId}/join`, {
       method: 'POST',
@@ -33,20 +34,20 @@ export const gameApi = {
       method: 'POST',
       body: { playerId },
     }),
-  takeTokens: (roomId: string, playerId: string, tokens: TokenKind[]) =>
+  takeTokens: (roomId: string, playerId: string, tokens: TokenKind[], options: ActionOptions = {}) =>
     request<GameState>(`/v1/rooms/${roomId}/actions/take-tokens`, {
       method: 'POST',
-      body: { playerId, tokens },
+      body: { playerId, tokens, ...options },
     }),
-  reserveCard: (roomId: string, playerId: string, source: Extract<CardSource, { kind: 'market' }>) =>
+  reserveCard: (roomId: string, playerId: string, source: Extract<CardSource, { kind: 'market' | 'deck' }>, options: ActionOptions = {}) =>
     request<GameState>(`/v1/rooms/${roomId}/actions/reserve`, {
       method: 'POST',
-      body: { playerId, source },
+      body: { playerId, source, ...options },
     }),
-  buyCard: (roomId: string, playerId: string, source: CardSource) =>
+  buyCard: (roomId: string, playerId: string, source: Exclude<CardSource, { kind: 'deck' }>, options: ActionOptions = {}) =>
     request<GameState>(`/v1/rooms/${roomId}/actions/buy`, {
       method: 'POST',
-      body: { playerId, source },
+      body: { playerId, source, ...options },
     }),
 };
 

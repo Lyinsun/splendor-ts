@@ -4,8 +4,9 @@ This file provides guidance to Codex and other coding agents when working in thi
 
 ## Project context
 
-- This repository is a TypeScript MVP for a multiplayer online board game inspired by Splendor's public rules shape.
-- The theme is original elemental companions. Do not add official Pokemon names, character art, screenshots, logos, sounds, or copied card data.
+- This repository is a TypeScript MVP for a multiplayer online board game based on the licensed Pokemon edition of the Splendor-style rules shape.
+- Pokemon names, evolution chains, type information, and authorized Pokemon edition card information may be used when they are within the documented license scope. Record non-sensitive scope notes in `docs/license-scope.md`; do not commit license contracts, secrets, API keys, or authorization materials.
+- Splendor and Pokemon content outside the documented authorization remains off limits: do not add unlicensed official art, screenshots, logos, sounds, rulebook text, or card data.
 - Reference `/Users/bytedance/Documents/Code/TheSeed/deepworld-seedts` for documentation discipline, DDD layering, and frontend delivery boundaries.
 - Use Node.js 22 through nvm for Node/npm commands:
 
@@ -55,9 +56,9 @@ delivery / interfaces -> application -> domain
 
 - `GameState` is the objective room snapshot.
 - `GameAction` is a player intent, not a direct mutation.
-- `applyGameAction` is the settlement boundary for token taking, card reserve, card purchase, mentor invitation, turn advance, final-round detection, and winner calculation.
+- `applyGameAction` is the settlement boundary for token taking, card reserve, card purchase/capture, post-action token discard, Pokemon evolution, special-card capture, turn advance, final-round detection, and winner calculation.
 - Resource changes must conserve tokens between player holdings and bank unless explicit rules create or remove availability.
-- MVP blocks actions that would exceed the 10-token limit instead of implementing post-action discard.
+- Pokemon edition rules allow players to exceed 10 tokens during the action, then discard openly until they hold at most 10 tokens before evolution and end checks.
 - Logs describe settled actions only; they are not a separate source of truth.
 
 ## Frontend rules
@@ -69,10 +70,11 @@ delivery / interfaces -> application -> domain
 - Endpoint errors must be visible in the UI; do not silently render failures as empty game state.
 - Use compact, operations-oriented UI. Avoid large decorative hero-only layouts that hide the actual game table.
 
-## IP and asset rules
+## License and asset rules
 
-- Use original creature names, card names, and generated art.
-- Do not store official Pokemon or Splendor art assets in this repository.
+- Use Pokemon names, type facts, evolution chains, card data, and visual assets only when `docs/license-scope.md` says that usage is authorized.
+- Keep non-sensitive license scope notes in docs. Do not commit contracts, confidential authorization evidence, secrets, or `.env`.
+- Do not store unlicensed Pokemon or Splendor art assets in this repository.
 - Generated project assets belong under `assets/splendor-monsters/`.
 - Theme-specific art belongs under `assets/splendor-monsters/themes/<theme-id>/`.
 - Theme card art should use `assets/splendor-monsters/themes/<theme-id>/cards/<element>-t<tier>.png` unless a documented per-card strategy replaces it.

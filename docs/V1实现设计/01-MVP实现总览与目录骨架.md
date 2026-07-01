@@ -44,8 +44,12 @@ test/
 | 房间服务 | 已落地 | API 手工验证与后续集成测试 |
 | WebSocket 广播 | 已落地 | 多窗口手工验证 |
 | Dashboard MVP | 已落地 | `npm run build:dashboard` |
-| 原创美术资源 | 已落地 | 文件存在和页面加载验证 |
+| 授权范围文档 | 已落地 | `docs/license-scope.md` |
+| 过渡美术资源 | 已落地 | 文件存在和页面加载验证 |
 | 主题资源分割与中英文展示 | 已落地 | `npm run typecheck` / `npm run build:dashboard` |
+| Pokémon 版进化规则 | 待实现 | Domain tests |
+| Pokémon 版特殊卡区 | 待实现 | Domain tests |
+| AI Agent 行动工具 | 待实现 | Integration tests |
 
 ## 四、测试计划
 
@@ -54,6 +58,10 @@ test/
   - 拿 3 个不同资源。
   - 保留市场卡并获得棱晶。
   - 购买卡牌并获得永久徽章。
+  - 行动后超过 10 个 token 时弃到 10 个。
+  - Pokémon 版进化条件校验与结算。
+  - 特殊卡区捕获与 Master Ball/prism 门槛。
+  - 18 分触发公平轮，平局按进化记录数和面前 Pokémon 数量处理。
   - 非当前玩家行动被拒绝。
 - Build checks:
   - `npm run typecheck`

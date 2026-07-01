@@ -35,7 +35,7 @@ flowchart TD
 - 使用图标按钮时优先使用 `lucide-react`。
 - 禁止使用大篇说明文字代替可操作控件。
 - 移动端要避免卡片和按钮文字溢出。
-- 视觉资产应展示真实项目主题，不使用官方 IP 素材。
+- 视觉资产应展示真实项目主题；授权 Pokémon 资产可使用，范围以 `docs/license-scope.md` 为准。
 - `zh-CN` 与 `en-US` 都必须能渲染主要 UI 文案、元素标签、卡牌显示名和导师显示名。
 - 主题化卡牌文案应放在 `frontend/dashboard/src/presentation/`，例如 `creatureAcademy.ts`；不得写入服务端领域卡牌事实。
 - 新增主题时同步更新 `asset-index.json`、`frontend/dashboard/src/presentation/themes.ts` 和对应 `image-generation/<theme-id>/` manifest。
@@ -64,6 +64,8 @@ assets/splendor-monsters/
 ```
 
 卡图路径约定为 `cards/<element>-t<tier>.png`。前端只能把它作为 `CompanionCard` 的展示资源来读取，不允许让图片目录决定卡牌是否存在、费用、分数或回合结果。
+
+授权 Pokémon 主题若采用逐卡素材，可以新增 `cards/<card-id>.png` 或 manifest 映射，但仍必须由服务端 `CompanionCard.id` 驱动渲染，不能让素材文件反向创建卡牌事实。
 
 ## 六、验证
 

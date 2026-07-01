@@ -8,15 +8,15 @@ Apply Splendor Monsters TS development guardrails to `$ARGUMENTS`.
 
 ## Purpose
 
-Use this skill to keep implementation aligned with the project goal: a TypeScript multiplayer board-game MVP with server-authoritative Splendor-style settlement and original elemental companion theming.
+Use this skill to keep implementation aligned with the project goal: a TypeScript multiplayer board-game MVP with server-authoritative Pokemon edition Splendor-style settlement.
 
-The project must not drift into a client-authoritative game, a copied Pokemon/Splendor asset pack, or a UI-only prototype without rule settlement.
+The project must not drift into a client-authoritative game, an unlicensed asset dump, or a UI-only prototype without rule settlement.
 
 ## Core invariants
 
 - The server-side game engine is the only writer of objective game state.
 - Browser clients submit `GameAction` intents only.
-- `applyGameAction` is the settlement boundary.
+- `applyGameAction` is the settlement boundary, including post-action token discard, Pokemon edition evolution, special-card capture, final-round detection, and winner calculation once implemented.
 - HTTP handlers translate transport requests and responses only.
 - WebSocket broadcasts room snapshots and never defines business rules.
 - Resource changes are conserved between bank and players unless explicit rules say otherwise.
@@ -55,12 +55,14 @@ Do not:
 - Show endpoint errors visibly.
 - Keep actions disabled when it is not the local player's turn.
 - Use existing API/WS contracts instead of local state mutation.
-- Use generated assets only as display metadata.
+- Use generated or authorized Pokemon assets only as display metadata.
 
-## IP and research guardrail
+## License and research guardrail
 
-- Do not use official Pokemon character names, images, sprites, logos, or sounds.
-- Do not store official Splendor art or copied card data.
+- Use official Pokemon names, evolution chains, type facts, card data, and assets only when covered by `docs/license-scope.md`.
+- Do not store license contracts, secrets, or authorization proof in the repository.
+- Do not store unlicensed Splendor art, rulebook text, or card data.
+- Treat `docs/璀璨宝石宝可梦_简规.pdf` and `docs/璀璨宝石宝可梦_A4DIY_有皮卡丘_ver1201.pdf` as the local Pokemon edition rule and card sources.
 - If external rule assumptions are needed, research and document the source under `docs/research.md` or `docs/research/`.
 
 ## Required workflow
@@ -85,6 +87,6 @@ source "$HOME/.nvm/nvm.sh" && nvm use 22 && npm run build:dashboard
 - [ ] HTTP handlers are thin DTO mapping.
 - [ ] WebSocket only broadcasts authoritative snapshots.
 - [ ] Dashboard does not import domain/application modules.
-- [ ] IP/asset boundaries are respected.
+- [ ] License and asset boundaries are respected.
 - [ ] Tests cover changed game rules or API behavior.
 - [ ] Docs are synchronized or divergence is recorded.

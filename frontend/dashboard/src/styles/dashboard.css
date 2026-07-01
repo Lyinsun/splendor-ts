@@ -37,6 +37,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  white-space: nowrap;
 }
 
 button:disabled {
@@ -56,14 +57,21 @@ select {
 }
 
 .app {
-  --accent: #d9a441;
-  --accent-contrast: #1d1608;
-  --accent-border: rgba(255, 224, 150, 0.8);
-  --active-border: rgba(217, 164, 65, 0.85);
-  --hero-image: url("/assets/splendor-monsters/themes/elemental-league/arena-hero.png");
+  --accent: #f6d449;
+  --accent-contrast: #1a1710;
+  --accent-border: rgba(255, 236, 122, 0.82);
+  --active-border: rgba(246, 212, 73, 0.9);
+  --hero-image: url("/assets/splendor-monsters/themes/pokemon-splendor/arena-hero.png");
   width: min(1480px, calc(100vw - 32px));
   margin: 0 auto;
   padding: 20px 0 32px;
+}
+
+.theme-pokemon-splendor {
+  --accent: #f6d449;
+  --accent-contrast: #1a1710;
+  --accent-border: rgba(255, 236, 122, 0.82);
+  --active-border: rgba(246, 212, 73, 0.9);
 }
 
 .theme-crystal-observatory {
@@ -197,6 +205,12 @@ label {
   font-weight: 800;
 }
 
+.small-button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
 .ghost-button {
   background: transparent;
 }
@@ -291,6 +305,8 @@ label {
 .play-area,
 .market-tier,
 .bank-panel,
+.settlement-panel,
+.special-panel,
 .mentor-panel {
   display: grid;
   gap: 12px;
@@ -321,10 +337,17 @@ label {
 .log-entry,
 .card-title,
 .player-heading,
-.tier-heading {
+.tier-heading,
+.tier-tools {
   display: flex;
   justify-content: space-between;
   gap: 10px;
+}
+
+.tier-tools {
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .room-row div,
@@ -397,6 +420,31 @@ label {
   align-items: center;
 }
 
+.settlement-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1.2fr);
+  gap: 12px;
+}
+
+.settlement-block {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.compact-token-row {
+  gap: 6px;
+}
+
+.token-choice {
+  min-width: 30px;
+  min-height: 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+
 .token-button {
   min-width: 82px;
   height: 58px;
@@ -424,6 +472,26 @@ label {
 
 .card-row {
   align-items: stretch;
+}
+
+.special-card-slot {
+  width: 205px;
+  display: grid;
+  gap: 6px;
+}
+
+.special-card-slot .compact-card {
+  width: 100%;
+}
+
+.special-rank {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(245, 247, 251, 0.82);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .companion-card {
@@ -523,33 +591,33 @@ label {
 }
 
 .token-fire {
-  background: #7e342e;
-  color: #ffe1d6;
+  background: #c6423e;
+  color: #fff1ec;
 }
 
 .token-water {
-  background: #255b7b;
-  color: #d7f0ff;
+  background: #2473aa;
+  color: #edf7ff;
 }
 
 .token-grass {
-  background: #2d6b49;
-  color: #d9ffe9;
+  background: #303237;
+  color: #f1f3f5;
 }
 
 .token-electric {
-  background: #85651c;
-  color: #fff0b9;
+  background: #d7aa24;
+  color: #201806;
 }
 
 .token-psychic {
-  background: #68487f;
-  color: #f0ddff;
+  background: #dc8fb5;
+  color: #2a101d;
 }
 
 .token-prism {
-  background: #e7e0cf;
-  color: #242424;
+  background: #7b58c8;
+  color: #f5efff;
 }
 
 @media (max-width: 1180px) {
@@ -588,6 +656,10 @@ label {
   }
 
   .lobby-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settlement-grid {
     grid-template-columns: 1fr;
   }
 

@@ -10,7 +10,7 @@ Use this skill before implementation depends on external facts that may change o
 
 - Prefer official sources for libraries, APIs, and game publisher materials.
 - If official sources are unavailable, use clearly labeled secondary sources and document the limitation.
-- Do not copy copyrighted rulebook text, card data, or art.
+- Do not copy copyrighted rulebook text, card data, or art unless `docs/license-scope.md` documents that the project is authorized to use that category. Even when authorized, do not commit confidential license materials.
 - Convert findings into project-specific decisions under `docs/research.md` or `docs/research/YYYY-MM-DD-*.md`.
 
 ## Research report shape

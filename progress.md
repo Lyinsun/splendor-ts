@@ -52,3 +52,22 @@
 - Dashboard card faces now show theme training notes when `creature-academy` is selected.
 - Added `docs/主题设计/01-灵兽学院主题设计.md` to document background abstraction, IP boundary, card content strategy, card-art strategy, and acceptance criteria.
 - Kept all card notes as presentation metadata only; no domain rules changed.
+
+## 2026-07-01 Pokemon Splendor Rules Slice
+
+- Switched the authoritative game content to a playable Pokemon edition deck shape: 35 tier-1 cards, 30 tier-2 cards, 15 tier-3 cards, 5 rare cards, and 5 legendary cards.
+- Added Pokemon evolution links, end-of-turn evolution records, special markets, Master Ball requirements, 18-point endgame, and Pokemon edition tie breakers in the domain model and tests.
+- Added `pokemon-splendor` as the default Dashboard theme with ball-token labels, Chinese card display names, and a hero image cropped from the authorized local A4DIY PDF.
+- Exposed Pokemon edition turn settlement in the Dashboard: discard-token selection, optional evolution selection, and reserve-from-deck buttons for tiers 1-3.
+- Added `listLegalGameActions` and `GET /v1/rooms/:roomId/players/:playerId/legal-actions` so Dashboard tooling and AI Agent code can ask the server for submit-ready legal `GameAction` candidates.
+- Added duplicate-card-ready Pokemon modeling: `CompanionCard.pokemonId` and source-card `evolvesTo`, matching the PDF card layout where evolution requirements are printed on tier-1/tier-2 source cards.
+- Replaced all 35 tier-1 normal cards with extracted PDF values from `a4diy-02/04/06/08.png`, including duplicate Pokemon cards, exact tier-1 costs, points, bonus balls, and source-card evolution requirements.
+- Replaced all 30 tier-2 normal cards with extracted PDF values from `a4diy-10/12/14.png`, including duplicate Pokemon cards, exact tier-2 costs, points, bonus balls, and source-card evolution requirements.
+- Replaced all tier-3, rare, and legendary cards with extracted PDF values from `a4diy-16/18/20.png`, separating special-card Master Ball requirements into `requiresPrism`.
+- Completed first-pass exact PDF card extraction in `docs/research/2026-07-01-pokemon-card-extraction.md` for all 90 cards.
+- Recorded the implementation boundary in `docs/research/2026-07-01-pokemon-splendor-variant.md`: the current card values are a playable engineering table, not a fully OCR-verified 1:1 extraction of the PDF card faces.
+
+## Known Remaining Work
+
+- Optional second-person review of all 90 extracted PDF card rows, especially special-card ordinary costs versus Master Ball requirements.
+- Wire an LLM player on top of `GET /legal-actions`, with the model selecting from server-validated action candidates instead of inferring rules from raw state alone.

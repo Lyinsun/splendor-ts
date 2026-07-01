@@ -5,6 +5,7 @@ import {
   startGame,
   type LobbyPlayerInput,
 } from '../domain/engine.js';
+import { listLegalGameActions, type LegalGameActionList } from '../domain/legal-actions.js';
 import { GameRuleError, type GameAction, type GameState } from '../domain/types.js';
 import { createId } from '../../shared/ids.js';
 
@@ -72,6 +73,10 @@ export class RoomService {
 
   getRoom(roomId: string): GameState {
     return clone(this.requireRoom(roomId));
+  }
+
+  listLegalActions(roomId: string, playerId: string): LegalGameActionList {
+    return listLegalGameActions(this.requireRoom(roomId), playerId);
   }
 
   joinRoom(roomId: string, playerName: string): JoinRoomResult {

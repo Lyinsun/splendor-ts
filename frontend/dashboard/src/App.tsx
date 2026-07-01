@@ -1,6 +1,6 @@
 import { Copy, Gem, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users } from 'lucide-react';
 import { type CSSProperties, useState } from 'react';
-import type { CardSource, CardTier, CompanionCard, ElementCost, GameState, PlayerState, TokenKind } from './api/types';
+import type { ActionOptions, CardSource, CardTier, CompanionCard, ElementCost, EvolutionSelection, GameState, PlayerState, SpecialCardRank, TokenKind } from './api/types';
 import { ELEMENTS } from './api/types';
 import { useGameRoom } from './hooks/useGameRoom';
 import {
@@ -24,8 +24,14 @@ import {
 
 const LOCALE_KEY = 'splendor-monsters-locale';
 const THEME_KEY = 'splendor-monsters-theme';
+const TOKEN_KIND_ORDER = ['fire', 'water', 'grass', 'electric', 'psychic', 'prism'] satisfies TokenKind[];
+const EVOLUTION_TIERS = [2, 3] satisfies CardTier[];
 
 type AppCopy = (typeof APP_COPY)[Locale];
+interface EvolutionCandidate {
+  selection: EvolutionSelection;
+  label: string;
+}
 
 export function App() {
   const game = useGameRoom();
@@ -36,6 +42,8 @@ export function App() {
   const [draftName, setDraftName] = useState(game.playerName);
   const [roomName, setRoomName] = useState(theme.defaultRoomName[locale]);
   const [tokenSelection, setTokenSelection] = useState<TokenKind[]>([]);
+  const [discardSelection, setDiscardSelection] = useState<TokenKind[]>([]);
+  const [evolutionSelection, setEvolutionSelection] = useState<EvolutionSelection | null>(null);
 
   const room = game.room;
   const myPlayer = game.currentPlayer;
@@ -58,9 +66,32 @@ export function App() {
     }
   };
 
+  const actionOptions = (): ActionOptions => buildActionOptions(room, myPlayer, discardSelection, evolutionSelection);
+  const clearSettlementDraft = () => {
+    setDiscardSelection([]);
+    setEvolutionSelection(null);
+  };
+
   const handleTakeTokens = async () => {
-    await game.takeTokens(tokenSelection);
-    setTokenSelection([]);
+    const next = await game.takeTokens(tokenSelection, actionOptions());
+    if (next !== null) {
+      setTokenSelection([]);
+      clearSettlementDraft();
+    }
+  };
+
+  const handleReserve = async (source: Extract<CardSource, { kind: 'market' | 'deck' }>) => {
+    const next = await game.reserveCard(source, actionOptions());
+    if (next !== null) {
+      clearSettlementDraft();
+    }
+  };
+
+  const handleBuy = async (source: Exclude<CardSource, { kind: 'deck' }>) => {
+    const next = await game.buyCard(source, actionOptions());
+    if (next !== null) {
+      clearSettlementDraft();
+    }
   };
 
   return (
@@ -131,14 +162,19 @@ export function App() {
           isMyTurn={game.isMyTurn}
           activePlayerName={game.activePlayer?.name ?? copy.watching}
           tokenSelection={tokenSelection}
+          discardSelection={discardSelection}
+          evolutionSelection={evolutionSelection}
           onTokenSelect={(token) => setTokenSelection((current) => nextTokenSelection(current, token))}
           onClearTokens={() => setTokenSelection([])}
+          onDiscardSelect={(token) => setDiscardSelection((current) => nextDiscardSelection(current, token))}
+          onClearDiscard={() => setDiscardSelection([])}
+          onEvolutionSelect={setEvolutionSelection}
           onTakeTokens={() => void handleTakeTokens()}
           onStart={() => void game.startRoom()}
           onAddDemoPlayer={() => void game.addDemoPlayer()}
           onLeave={game.leaveLocalRoom}
-          onReserve={(source) => void game.reserveCard(source)}
-          onBuy={(source) => void game.buyCard(source)}
+          onReserve={(source) => void handleReserve(source)}
+          onBuy={(source) => void handleBuy(source)}
         />
       )}
     </main>
@@ -234,14 +270,19 @@ function GameTable(props: {
   isMyTurn: boolean;
   activePlayerName: string;
   tokenSelection: TokenKind[];
+  discardSelection: TokenKind[];
+  evolutionSelection: EvolutionSelection | null;
   onTokenSelect: (token: TokenKind) => void;
   onClearTokens: () => void;
+  onDiscardSelect: (token: TokenKind) => void;
+  onClearDiscard: () => void;
+  onEvolutionSelect: (selection: EvolutionSelection | null) => void;
   onTakeTokens: () => void;
   onStart: () => void;
   onAddDemoPlayer: () => void;
   onLeave: () => void;
-  onReserve: (source: Extract<CardSource, { kind: 'market' }>) => void;
-  onBuy: (source: CardSource) => void;
+  onReserve: (source: Extract<CardSource, { kind: 'market' | 'deck' }>) => void;
+  onBuy: (source: Exclude<CardSource, { kind: 'deck' }>) => void;
 }) {
   const winnerNames = props.room.players.filter((player) => props.room.winnerIds.includes(player.id)).map((player) => player.name).join(', ');
   return (
@@ -282,16 +323,30 @@ function GameTable(props: {
         </div>
 
         {props.room.status === 'playing' ? (
-          <BankPanel
-            copy={props.copy}
-            locale={props.locale}
-            room={props.room}
-            disabled={!props.isMyTurn || props.busy}
-            tokenSelection={props.tokenSelection}
-            onTokenSelect={props.onTokenSelect}
-            onClearTokens={props.onClearTokens}
-            onTakeTokens={props.onTakeTokens}
-          />
+          <>
+            <BankPanel
+              copy={props.copy}
+              locale={props.locale}
+              room={props.room}
+              disabled={!props.isMyTurn || props.busy}
+              tokenSelection={props.tokenSelection}
+              onTokenSelect={props.onTokenSelect}
+              onClearTokens={props.onClearTokens}
+              onTakeTokens={props.onTakeTokens}
+            />
+            <SettlementPanel
+              copy={props.copy}
+              locale={props.locale}
+              room={props.room}
+              player={props.myPlayer}
+              disabled={!props.isMyTurn || props.busy}
+              discardSelection={props.discardSelection}
+              evolutionSelection={props.evolutionSelection}
+              onDiscardSelect={props.onDiscardSelect}
+              onClearDiscard={props.onClearDiscard}
+              onEvolutionSelect={props.onEvolutionSelect}
+            />
+          </>
         ) : null}
 
         <div className="market-grid">
@@ -303,6 +358,7 @@ function GameTable(props: {
               themeId={props.themeId}
               tier={tier as CardTier}
               cards={props.room.board.market[tier as CardTier]}
+              deckCount={props.room.board.decks[tier as CardTier].length}
               disabled={!props.isMyTurn || props.busy || props.room.status !== 'playing'}
               player={props.myPlayer}
               onReserve={props.onReserve}
@@ -310,6 +366,16 @@ function GameTable(props: {
             />
           ))}
         </div>
+
+        <SpecialMarket
+          copy={props.copy}
+          locale={props.locale}
+          themeId={props.themeId}
+          room={props.room}
+          disabled={!props.isMyTurn || props.busy || props.room.status !== 'playing'}
+          player={props.myPlayer}
+          onBuy={props.onBuy}
+        />
 
         <section className="panel mentor-panel">
           <h3>{props.copy.gymMentors}</h3>
@@ -351,6 +417,47 @@ function GameTable(props: {
           ))}
         </div>
       </aside>
+    </section>
+  );
+}
+
+function SpecialMarket(props: {
+  copy: AppCopy;
+  locale: Locale;
+  themeId: ThemeId;
+  room: GameState;
+  disabled: boolean;
+  player: PlayerState | undefined;
+  onBuy: (source: Exclude<CardSource, { kind: 'deck' }>) => void;
+}) {
+  const ranks = ['rare', 'legendary'] satisfies SpecialCardRank[];
+  const visibleCards = ranks.flatMap((rank) => props.room.board.specialMarket[rank].map((card) => ({ rank, card })));
+  if (visibleCards.length === 0) {
+    return null;
+  }
+  return (
+    <section className="panel special-panel">
+      <div className="tier-heading">
+        <h3>{props.copy.specialCards}</h3>
+        <span>{visibleCards.length} {props.copy.open}</span>
+      </div>
+      <div className="card-row">
+        {visibleCards.map(({ rank, card }) => (
+          <div className="special-card-slot" key={`${rank}-${card.id}`}>
+            <span className="special-rank">{props.copy.specialRank[rank]}</span>
+            <CompanionCardView
+              copy={props.copy}
+              locale={props.locale}
+              themeId={props.themeId}
+              card={card}
+              compact
+              disabled={props.disabled}
+              affordable={props.player === undefined ? false : canAfford(props.player, card)}
+              onBuy={() => props.onBuy({ kind: 'special_market', rank, cardId: card.id })}
+            />
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -400,22 +507,108 @@ function BankPanel(props: {
   );
 }
 
+function SettlementPanel(props: {
+  copy: AppCopy;
+  locale: Locale;
+  room: GameState;
+  player: PlayerState | undefined;
+  disabled: boolean;
+  discardSelection: TokenKind[];
+  evolutionSelection: EvolutionSelection | null;
+  onDiscardSelect: (token: TokenKind) => void;
+  onClearDiscard: () => void;
+  onEvolutionSelect: (selection: EvolutionSelection | null) => void;
+}) {
+  if (props.player === undefined) {
+    return null;
+  }
+  const candidates = evolutionCandidates(props.player, props.room, props.locale);
+  const selectedEvolutionValue = props.evolutionSelection === null ? '' : evolutionValue(props.evolutionSelection);
+  const knownSelectedEvolution = candidates.some((candidate) => evolutionValue(candidate.selection) === selectedEvolutionValue) ? selectedEvolutionValue : '';
+  const selectedDiscardText = props.discardSelection.length === 0
+    ? props.copy.noEnergySelected
+    : props.discardSelection.map((token) => tokenLabel(token, props.locale)).join(', ');
+
+  return (
+    <section className="panel settlement-panel">
+      <div className="tier-heading">
+        <h3>{props.copy.settlement}</h3>
+        <span>{props.copy.discardTokens}: {selectedDiscardText}</span>
+      </div>
+      <div className="settlement-grid">
+        <div className="settlement-block">
+          <strong>{props.copy.discardTokens}</strong>
+          <div className="bank-tokens compact-token-row">
+            {TOKEN_KIND_ORDER.map((token) => {
+              const selectedCount = props.discardSelection.filter((entry) => entry === token).length;
+              const heldCount = props.player?.tokens[token] ?? 0;
+              const selectableCount = heldCount + futureTokenAllowance(token);
+              return (
+                <button
+                  type="button"
+                  className={`mini-token token-choice ${tokenClassName(token)}`}
+                  disabled={props.disabled || selectableCount <= selectedCount}
+                  onClick={() => props.onDiscardSelect(token)}
+                  title={tokenLabel(token, props.locale)}
+                  key={token}
+                >
+                  {Math.max(heldCount - selectedCount, 0)}
+                </button>
+              );
+            })}
+          </div>
+          <button type="button" className="ghost-button small-button" disabled={props.disabled || props.discardSelection.length === 0} onClick={props.onClearDiscard}>
+            {props.copy.clear}
+          </button>
+        </div>
+        <label className="settlement-block">
+          {props.copy.optionalEvolution}
+          <select
+            value={knownSelectedEvolution}
+            disabled={props.disabled || candidates.length === 0}
+            onChange={(event) => {
+              const candidate = candidates.find((entry) => evolutionValue(entry.selection) === event.target.value);
+              props.onEvolutionSelect(candidate?.selection ?? null);
+            }}
+          >
+            <option value="">{props.copy.noEvolution}</option>
+            {candidates.map((candidate) => (
+              <option key={evolutionValue(candidate.selection)} value={evolutionValue(candidate.selection)}>{candidate.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </section>
+  );
+}
+
 function MarketTier(props: {
   copy: AppCopy;
   locale: Locale;
   themeId: ThemeId;
   tier: CardTier;
   cards: CompanionCard[];
+  deckCount: number;
   disabled: boolean;
   player: PlayerState | undefined;
-  onReserve: (source: Extract<CardSource, { kind: 'market' }>) => void;
-  onBuy: (source: CardSource) => void;
+  onReserve: (source: Extract<CardSource, { kind: 'market' | 'deck' }>) => void;
+  onBuy: (source: Exclude<CardSource, { kind: 'deck' }>) => void;
 }) {
   return (
     <section className="panel market-tier">
       <div className="tier-heading">
         <h3>{props.copy.tier} {props.tier}</h3>
-        <span>{props.cards.length} {props.copy.open}</span>
+        <div className="tier-tools">
+          <span>{props.cards.length} {props.copy.open}</span>
+          <button
+            type="button"
+            className="ghost-button small-button"
+            disabled={props.disabled || props.deckCount <= 0}
+            onClick={() => props.onReserve({ kind: 'deck', tier: props.tier })}
+          >
+            {props.copy.reserveDeck}
+          </button>
+        </div>
       </div>
       <div className="card-row">
         {props.cards.map((card) => (
@@ -490,6 +683,10 @@ function PlayerPanel(props: { copy: AppCopy; locale: Locale; player: PlayerState
           <span key={element}>{tokenLabel(element, props.locale)}: {props.player.tokens[element]}</span>
         ))}
       </div>
+      <div className="token-row">
+        <span>{props.copy.evolutions}: {props.player.evolutionRecords.length}</span>
+        <span>{props.copy.pokemonInPlay}: {props.player.tableau.length}</span>
+      </div>
     </article>
   );
 }
@@ -518,14 +715,104 @@ function nextTokenSelection(current: TokenKind[], token: TokenKind): TokenKind[]
   return next;
 }
 
+function nextDiscardSelection(current: TokenKind[], token: TokenKind): TokenKind[] {
+  return [...current, token];
+}
+
+function futureTokenAllowance(token: TokenKind): number {
+  return token === 'prism' ? 1 : 3;
+}
+
+function buildActionOptions(
+  room: GameState | null,
+  player: PlayerState | undefined,
+  discardSelection: TokenKind[],
+  evolutionSelection: EvolutionSelection | null,
+): ActionOptions {
+  const options: ActionOptions = {};
+  if (discardSelection.length > 0) {
+    options.discardTokens = [...discardSelection];
+  }
+  if (room !== null && player !== undefined && evolutionSelection !== null && isValidEvolutionSelection(player, room, evolutionSelection)) {
+    options.evolution = evolutionSelection;
+  }
+  return options;
+}
+
 function canAfford(player: PlayerState, card: CompanionCard): boolean {
-  let prismNeeded = 0;
+  let prismNeeded = card.requiresPrism === true || card.specialRank !== undefined ? 1 : 0;
   for (const element of ELEMENTS) {
     const required = Math.max((card.cost[element] ?? 0) - player.bonuses[element], 0);
     const missing = Math.max(required - player.tokens[element], 0);
     prismNeeded += missing;
   }
   return prismNeeded <= player.tokens.prism;
+}
+
+function evolutionCandidates(player: PlayerState, room: GameState, locale: Locale): EvolutionCandidate[] {
+  const targetCards: Array<{ card: CompanionCard; to: EvolutionSelection['to']; sourceLabel: string }> = [];
+  for (const tier of EVOLUTION_TIERS) {
+    for (const card of room.board.market[tier]) {
+      targetCards.push({
+        card,
+        to: { kind: 'market', tier, cardId: card.id },
+        sourceLabel: locale === 'zh-CN' ? `等级 ${tier}` : `tier ${tier}`,
+      });
+    }
+  }
+  for (const card of player.reserved) {
+    targetCards.push({
+      card,
+      to: { kind: 'reserved', cardId: card.id },
+      sourceLabel: locale === 'zh-CN' ? '保留区' : 'reserve',
+    });
+  }
+
+  const candidates: EvolutionCandidate[] = [];
+  for (const from of player.tableau) {
+    for (const target of targetCards) {
+      if (!isEvolutionChain(from, target.card)) {
+        continue;
+      }
+      const fromText = cardText(from, locale);
+      const toText = cardText(target.card, locale);
+      candidates.push({
+        selection: { fromCardId: from.id, to: target.to },
+        label: `${fromText.name} -> ${toText.name} · ${target.sourceLabel}`,
+      });
+    }
+  }
+  return candidates;
+}
+
+function isEvolutionChain(from: CompanionCard, to: CompanionCard): boolean {
+  if (from.specialRank !== undefined || to.specialRank !== undefined) {
+    return false;
+  }
+  if (to.tier !== from.tier + 1) {
+    return false;
+  }
+  const fromPokemonId = pokemonIdForEvolution(from);
+  const toPokemonId = pokemonIdForEvolution(to);
+  if (from.evolvesTo !== undefined) {
+    return from.evolvesTo.pokemonId === toPokemonId;
+  }
+  return to.evolvesFrom === from.id || to.evolvesFrom === fromPokemonId;
+}
+
+function isValidEvolutionSelection(player: PlayerState, room: GameState, selection: EvolutionSelection): boolean {
+  return evolutionCandidates(player, room, 'en-US').some((candidate) => evolutionValue(candidate.selection) === evolutionValue(selection));
+}
+
+function evolutionValue(selection: EvolutionSelection): string {
+  if (selection.to.kind === 'reserved') {
+    return `${selection.fromCardId}:reserved:${selection.to.cardId}`;
+  }
+  return `${selection.fromCardId}:market:${selection.to.tier}:${selection.to.cardId}`;
+}
+
+function pokemonIdForEvolution(card: CompanionCard): string {
+  return card.pokemonId ?? card.id;
 }
 
 function copyRoomId(roomId: string): void {

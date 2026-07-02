@@ -329,6 +329,8 @@ function GameTable(props: {
   const hasBoard = props.room.status !== 'lobby';
   const actionDisabled = !props.isMyTurn || props.busy || props.room.status !== 'playing';
   const actionDisabledReason = describeActionDisabledReason(props.copy, props.room, props.isMyTurn, props.busy);
+  const localPlayers = props.room.players.filter((p) => props.localPlayerIds.includes(p.id));
+  const hasAnyReserved = localPlayers.some((p) => p.reserved.length > 0);
   return (
     <section className="table-layout standard-table">
       <aside className="panel side-panel player-rail">
@@ -381,6 +383,37 @@ function GameTable(props: {
           </div>
           <StatusPill label={props.isMyTurn ? props.copy.yourMove : props.copy.watching} tone={props.isMyTurn ? 'good' : 'muted'} />
         </div>
+
+        {hasBoard && localPlayers.length > 0 ? (
+          <div className="reserved-row panel">
+            <h3>{props.copy.yourReserve}</h3>
+            {!hasAnyReserved ? <p className="empty">{props.copy.noReserved}</p> : null}
+            <div className="reserved-groups">
+              {localPlayers.map((lp) => (
+                lp.reserved.length > 0 ? (
+                  <div className="reserved-group" key={lp.id}>
+                    <span className="reserved-group-label">{lp.name}</span>
+                    <div className="reserved-cards">
+                      {lp.reserved.map((card) => (
+                        <CompanionCardView
+                          key={card.id}
+                          copy={props.copy}
+                          locale={props.locale}
+                          themeId={props.themeId}
+                          card={card}
+                          compact
+                          disabled={lp.id !== props.playerId || !props.isMyTurn || props.busy}
+                          affordable={canAfford(lp, card)}
+                          onBuy={() => props.onBuy({ kind: 'reserved', cardId: card.id })}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {hasBoard ? (
           <div className="field-board">
@@ -458,37 +491,22 @@ function GameTable(props: {
                   ))}
                 </div>
               </section>
+
+              <section className="panel log-panel">
+                <h3>{props.copy.battleLog}</h3>
+                <div className="log-list">
+                  {props.room.logs.slice(0, 12).map((entry) => (
+                    <div className="log-entry" key={entry.id}>
+                      <span>{props.copy.turn} {entry.turn}</span>
+                      <p>{formatLogMessage(entry, props.locale)}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
             </div>
           </div>
         ) : null}
       </section>
-
-      <aside className="panel side-panel table-rail">
-        <h3>{props.copy.yourReserve}</h3>
-        {props.myPlayer?.reserved.length === 0 ? <p className="empty">{props.copy.noReserved}</p> : null}
-        {props.myPlayer?.reserved.map((card) => (
-          <CompanionCardView
-            key={card.id}
-            copy={props.copy}
-            locale={props.locale}
-            themeId={props.themeId}
-            card={card}
-            compact
-            disabled={!props.isMyTurn || props.busy}
-            affordable={props.myPlayer === undefined ? false : canAfford(props.myPlayer, card)}
-            onBuy={() => props.onBuy({ kind: 'reserved', cardId: card.id })}
-          />
-        ))}
-        <h3>{props.copy.battleLog}</h3>
-        <div className="log-list">
-          {props.room.logs.slice(0, 12).map((entry) => (
-            <div className="log-entry" key={entry.id}>
-              <span>{props.copy.turn} {entry.turn}</span>
-              <p>{formatLogMessage(entry, props.locale)}</p>
-            </div>
-          ))}
-        </div>
-      </aside>
     </section>
   );
 }
@@ -779,6 +797,7 @@ function PlayerPanel(props: { copy: AppCopy; locale: Locale; player: PlayerState
       <div className="token-row">
         <span>{props.copy.evolutions}: {props.player.evolutionRecords.length}</span>
         <span>{props.copy.pokemonInPlay}: {props.player.tableau.length}</span>
+        {props.player.reserved.length > 0 ? <span className="reserved-count">🎴 {props.player.reserved.length}</span> : null}
       </div>
     </article>
   );

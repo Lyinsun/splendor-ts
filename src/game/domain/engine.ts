@@ -205,13 +205,15 @@ function createInitialBoard(seed: string, playerCount: number): BoardState {
     rare: shuffle(COMPANION_CARDS.filter((card) => card.specialRank === 'rare'), random),
     legendary: shuffle(COMPANION_CARDS.filter((card) => card.specialRank === 'legendary'), random),
   } satisfies Record<SpecialCardRank, CompanionCard[]>;
+  const leaderCount = Math.min(playerCount + 1, GYM_LEADERS.length);
+  const shuffledLeaders = shuffle([...GYM_LEADERS], random).slice(0, leaderCount);
   const board: BoardState = {
     bank: { fire: tokenCount, water: tokenCount, grass: tokenCount, electric: tokenCount, psychic: tokenCount, prism: 5 },
     decks,
     market: { 1: [], 2: [], 3: [] },
     specialDecks,
     specialMarket: { rare: [], legendary: [] },
-    gymLeaders: [],
+    gymLeaders: shuffledLeaders,
   };
   for (const tier of CARD_TIERS) {
     refillMarket(board, tier);

@@ -19,7 +19,7 @@ describe('game engine', () => {
     expect(game.board.market[1]).toHaveLength(4);
     expect(game.board.market[2]).toHaveLength(4);
     expect(game.board.market[3]).toHaveLength(4);
-    expect(game.board.gymLeaders).toHaveLength(0);
+    expect(game.board.gymLeaders).toHaveLength(3);
     expect(game.board.specialMarket.rare).toHaveLength(1);
     expect(game.board.specialMarket.legendary).toHaveLength(1);
   });

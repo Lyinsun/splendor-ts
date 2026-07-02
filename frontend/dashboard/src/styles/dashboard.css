@@ -795,10 +795,68 @@ label {
   white-space: nowrap;
 }
 
+.reserved-row {
+  margin-top: 0;
+}
+
+.reserved-row h3 {
+  margin-bottom: 8px;
+}
+
+.reserved-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reserved-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.reserved-group-label {
+  flex-shrink: 0;
+  min-width: 80px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding-top: 4px;
+}
+
+.reserved-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reserved-cards .companion-card {
+  width: 160px;
+  min-width: 160px;
+}
+
+.field-side-stack .log-panel {
+  max-height: 320px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.field-side-stack .log-panel .log-list {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.player-panel .reserved-count {
+  font-weight: 600;
+  color: var(--accent);
+}
+
 .standard-field .field-board {
   width: 100%;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 245px;
+  grid-template-columns: 260px minmax(0, 1fr) 280px;
   gap: 12px;
   align-items: start;
 }

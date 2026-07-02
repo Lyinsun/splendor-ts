@@ -477,4 +477,47 @@ export const COMPANION_CARDS: CompanionCard[] = [
   }),
 ];
 
-export const GYM_LEADERS: GymLeader[] = [];
+export const GYM_LEADERS: GymLeader[] = [
+  {
+    id: 'leader-flare',
+    name: 'Flare Warden',
+    element: 'fire',
+    points: 3,
+    requirement: { fire: 4 },
+  },
+  {
+    id: 'leader-tide',
+    name: 'Tide Warden',
+    element: 'water',
+    points: 3,
+    requirement: { water: 4 },
+  },
+  {
+    id: 'leader-grove',
+    name: 'Grove Warden',
+    element: 'grass',
+    points: 3,
+    requirement: { grass: 4 },
+  },
+  {
+    id: 'leader-storm',
+    name: 'Storm Warden',
+    element: 'electric',
+    points: 3,
+    requirement: { electric: 4 },
+  },
+  {
+    id: 'leader-mystic',
+    name: 'Mystic Warden',
+    element: 'psychic',
+    points: 3,
+    requirement: { psychic: 4 },
+  },
+  {
+    id: 'leader-prism',
+    name: 'Prism Warden',
+    element: 'psychic',
+    points: 5,
+    requirement: { fire: 3, water: 3, grass: 3, electric: 3 },
+  },
+];

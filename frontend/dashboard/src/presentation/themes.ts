@@ -244,7 +244,7 @@ export const APP_COPY = {
       legendary: '传说',
     } satisfies Record<'rare' | 'legendary', string>,
     gymMentors: '训练师人物',
-    yourReserve: '控制席位保留区',
+    yourReserve: '保留卡牌',
     noReserved: '没有保留的伙伴。',
     battleLog: '战斗日志',
     buy: '购买',
@@ -431,7 +431,7 @@ export const APP_COPY = {
       legendary: 'Legendary',
     } satisfies Record<'rare' | 'legendary', string>,
     gymMentors: 'Trainer tiles',
-    yourReserve: 'Controlled reserve',
+    yourReserve: 'Reserved cards',
     noReserved: 'No reserved companions.',
     battleLog: 'Battle log',
     buy: 'Buy',
@@ -658,6 +658,7 @@ const ZH_LEADER_COPY: Partial<Record<string, string>> = {
   'leader-grove': '林冠导师',
   'leader-storm': '风暴导师',
   'leader-oracle': '预言导师',
+  'leader-mystic': '秘语导师',
   'leader-prism': '棱晶导师',
 };
 

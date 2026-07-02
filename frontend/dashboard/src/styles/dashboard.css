@@ -223,6 +223,23 @@ label {
   padding: 12px 14px;
 }
 
+.action-problem {
+  min-height: 44px;
+  margin: 0;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 194, 102, 0.42);
+  border-radius: 8px;
+  background: rgba(95, 63, 23, 0.45);
+  color: rgba(255, 235, 190, 0.94);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.action-problem.is-empty {
+  visibility: hidden;
+}
+
 .hero-panel {
   margin-top: 14px;
   border-radius: 8px;
@@ -755,7 +772,7 @@ label {
 }
 
 .standard-field {
-  --bank-panel-height: 360px;
+  --bank-panel-height: 410px;
   --settlement-panel-height: 254px;
   --market-tier-height: 430px;
   --market-card-height: 382px;
@@ -801,15 +818,23 @@ label {
 .field-control-stack .bank-panel {
   height: var(--bank-panel-height);
   display: grid;
-  grid-template-rows: 54px 190px 78px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 54px 190px 44px 78px;
   align-items: stretch;
   overflow: hidden;
 }
 
 .field-control-stack .bank-panel > div:first-child {
+  width: 100%;
   min-width: 0;
   min-height: 54px;
   overflow: hidden;
+}
+
+.field-control-stack .bank-panel > .bank-tokens,
+.field-control-stack .bank-panel > .action-problem,
+.field-control-stack .bank-panel > .bank-actions {
+  width: 100%;
 }
 
 .field-control-stack .bank-panel p,
@@ -817,6 +842,13 @@ label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.field-control-stack .bank-panel .action-problem {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .field-control-stack .bank-tokens {

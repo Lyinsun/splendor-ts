@@ -2,7 +2,7 @@ import { Copy, Gem, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, U
 import { type CSSProperties, useState } from 'react';
 import type { ActionOptions, CardSource, CardTier, CompanionCard, ElementCost, EvolutionSelection, GameState, PlayerState, SpecialCardRank, TokenKind } from './api/types';
 import { ELEMENTS } from './api/types';
-import { useGameRoom } from './hooks/useGameRoom';
+import { useGameRoom, type GameRoomError } from './hooks/useGameRoom';
 import {
   APP_COPY,
   LOCALE_OPTIONS,
@@ -28,6 +28,7 @@ const TOKEN_KIND_ORDER = ['fire', 'water', 'grass', 'electric', 'psychic', 'pris
 const EVOLUTION_TIERS = [2, 3] satisfies CardTier[];
 
 type AppCopy = (typeof APP_COPY)[Locale];
+type ActionContext = 'take_tokens' | null;
 interface EvolutionCandidate {
   selection: EvolutionSelection;
   label: string;
@@ -44,6 +45,7 @@ export function App() {
   const [tokenSelection, setTokenSelection] = useState<TokenKind[]>([]);
   const [discardSelection, setDiscardSelection] = useState<TokenKind[]>([]);
   const [evolutionSelection, setEvolutionSelection] = useState<EvolutionSelection | null>(null);
+  const [lastActionContext, setLastActionContext] = useState<ActionContext>(null);
 
   const room = game.room;
   const myPlayer = game.currentPlayer;
@@ -73,14 +75,17 @@ export function App() {
   };
 
   const handleTakeTokens = async () => {
+    setLastActionContext('take_tokens');
     const next = await game.takeTokens(tokenSelection, actionOptions());
     if (next !== null) {
       setTokenSelection([]);
       clearSettlementDraft();
+      setLastActionContext(null);
     }
   };
 
   const handleReserve = async (source: Extract<CardSource, { kind: 'market' | 'deck' }>) => {
+    setLastActionContext(null);
     const next = await game.reserveCard(source, actionOptions());
     if (next !== null) {
       clearSettlementDraft();
@@ -88,6 +93,7 @@ export function App() {
   };
 
   const handleBuy = async (source: Exclude<CardSource, { kind: 'deck' }>) => {
+    setLastActionContext(null);
     const next = await game.buyCard(source, actionOptions());
     if (next !== null) {
       clearSettlementDraft();
@@ -162,14 +168,30 @@ export function App() {
           isHost={game.isHost}
           isMyTurn={game.isMyTurn}
           activePlayerName={game.activePlayer?.name ?? copy.watching}
+          lastTakeError={lastActionContext === 'take_tokens' ? game.lastError : null}
           tokenSelection={tokenSelection}
           discardSelection={discardSelection}
           evolutionSelection={evolutionSelection}
-          onTokenSelect={(token) => setTokenSelection((current) => nextTokenSelection(current, token))}
-          onClearTokens={() => setTokenSelection([])}
-          onDiscardSelect={(token) => setDiscardSelection((current) => nextDiscardSelection(current, token))}
-          onClearDiscard={() => setDiscardSelection([])}
-          onEvolutionSelect={setEvolutionSelection}
+          onTokenSelect={(token) => {
+            setLastActionContext(null);
+            setTokenSelection((current) => nextTokenSelection(current, token));
+          }}
+          onClearTokens={() => {
+            setLastActionContext(null);
+            setTokenSelection([]);
+          }}
+          onDiscardSelect={(token) => {
+            setLastActionContext(null);
+            setDiscardSelection((current) => nextDiscardSelection(current, token));
+          }}
+          onClearDiscard={() => {
+            setLastActionContext(null);
+            setDiscardSelection([]);
+          }}
+          onEvolutionSelect={(selection) => {
+            setLastActionContext(null);
+            setEvolutionSelection(selection);
+          }}
           onTakeTokens={() => void handleTakeTokens()}
           onStart={() => void game.startRoom()}
           onAddDemoPlayer={() => void game.addDemoPlayer()}
@@ -272,6 +294,7 @@ function GameTable(props: {
   isHost: boolean;
   isMyTurn: boolean;
   activePlayerName: string;
+  lastTakeError: GameRoomError | null;
   tokenSelection: TokenKind[];
   discardSelection: TokenKind[];
   evolutionSelection: EvolutionSelection | null;
@@ -290,6 +313,8 @@ function GameTable(props: {
 }) {
   const winnerNames = props.room.players.filter((player) => props.room.winnerIds.includes(player.id)).map((player) => player.name).join(', ');
   const hasBoard = props.room.status !== 'lobby';
+  const actionDisabled = !props.isMyTurn || props.busy || props.room.status !== 'playing';
+  const actionDisabledReason = describeActionDisabledReason(props.copy, props.room, props.isMyTurn, props.busy);
   return (
     <section className="table-layout standard-table">
       <aside className="panel side-panel player-rail">
@@ -350,8 +375,12 @@ function GameTable(props: {
                 copy={props.copy}
                 locale={props.locale}
                 room={props.room}
-                disabled={!props.isMyTurn || props.busy || props.room.status !== 'playing'}
+                player={props.myPlayer}
+                disabled={actionDisabled}
+                disabledReason={actionDisabledReason}
+                lastTakeError={props.lastTakeError}
                 tokenSelection={props.tokenSelection}
+                discardSelection={props.discardSelection}
                 onTokenSelect={props.onTokenSelect}
                 onClearTokens={props.onClearTokens}
                 onTakeTokens={props.onTakeTokens}
@@ -362,7 +391,7 @@ function GameTable(props: {
                   locale={props.locale}
                   room={props.room}
                   player={props.myPlayer}
-                  disabled={!props.isMyTurn || props.busy}
+                  disabled={actionDisabled}
                   discardSelection={props.discardSelection}
                   evolutionSelection={props.evolutionSelection}
                   onDiscardSelect={props.onDiscardSelect}
@@ -383,7 +412,7 @@ function GameTable(props: {
                     tier={tier as CardTier}
                     cards={props.room.board.market[tier as CardTier]}
                     deckCount={props.room.board.decks[tier as CardTier].length}
-                    disabled={!props.isMyTurn || props.busy || props.room.status !== 'playing'}
+                    disabled={actionDisabled}
                     player={props.myPlayer}
                     onReserve={props.onReserve}
                     onBuy={props.onBuy}
@@ -398,7 +427,7 @@ function GameTable(props: {
                 locale={props.locale}
                 themeId={props.themeId}
                 room={props.room}
-                disabled={!props.isMyTurn || props.busy || props.room.status !== 'playing'}
+                disabled={actionDisabled}
                 player={props.myPlayer}
                 onBuy={props.onBuy}
               />
@@ -501,13 +530,21 @@ function BankPanel(props: {
   copy: AppCopy;
   locale: Locale;
   room: GameState;
+  player: PlayerState | undefined;
   disabled: boolean;
+  disabledReason: string | null;
+  lastTakeError: GameRoomError | null;
   tokenSelection: TokenKind[];
+  discardSelection: TokenKind[];
   onTokenSelect: (token: TokenKind) => void;
   onClearTokens: () => void;
   onTakeTokens: () => void;
 }) {
   const selectionText = props.tokenSelection.length === 0 ? props.copy.noEnergySelected : props.tokenSelection.map((token) => tokenLabel(token, props.locale)).join(', ');
+  const selectionProblem = describeTokenTakeSelectionProblem(props.copy, props.locale, props.room, props.player, props.tokenSelection, props.discardSelection);
+  const serverProblem = describeTokenTakeServerProblem(props.copy, props.locale, props.lastTakeError);
+  const takeProblem = props.disabledReason ?? selectionProblem ?? serverProblem;
+  const takeDisabled = props.disabled || props.tokenSelection.length === 0 || selectionProblem !== null;
   return (
     <section className="panel bank-panel">
       <div>
@@ -532,9 +569,10 @@ function BankPanel(props: {
           <strong>{props.room.board.bank.prism}</strong>
         </div>
       </div>
+      <p className={`action-problem${takeProblem === null ? ' is-empty' : ''}`} aria-live="polite">{takeProblem ?? ''}</p>
       <div className="bank-actions">
         <button type="button" onClick={props.onClearTokens} disabled={props.disabled || props.tokenSelection.length === 0}>{props.copy.clear}</button>
-        <button type="button" className="primary-button" onClick={props.onTakeTokens} disabled={props.disabled || props.tokenSelection.length === 0}>
+        <button type="button" className="primary-button" onClick={props.onTakeTokens} disabled={takeDisabled}>
           <Gem size={18} /> {props.copy.takeEnergy}
         </button>
       </div>
@@ -748,6 +786,116 @@ function StatusPill(props: { label: string; tone: 'good' | 'warn' | 'muted' }) {
   return <span className={`status-pill ${props.tone}`}>{props.label}</span>;
 }
 
+function describeActionDisabledReason(copy: AppCopy, room: GameState, isMyTurn: boolean, busy: boolean): string | null {
+  if (busy) {
+    return copy.tokenTakeProblems.busy;
+  }
+  if (room.status !== 'playing') {
+    return copy.tokenTakeProblems.notPlaying;
+  }
+  if (!isMyTurn) {
+    return copy.tokenTakeProblems.notCurrentTurn;
+  }
+  return null;
+}
+
+function describeTokenTakeSelectionProblem(
+  copy: AppCopy,
+  locale: Locale,
+  room: GameState,
+  player: PlayerState | undefined,
+  tokenSelection: TokenKind[],
+  discardSelection: TokenKind[],
+): string | null {
+  if (tokenSelection.length === 0) {
+    return null;
+  }
+  if (tokenSelection.some((token) => !isElementToken(token))) {
+    return copy.tokenTakeProblems.cannotTakePrism;
+  }
+
+  const selectionCounts = countTokens(tokenSelection);
+  const entries = TOKEN_KIND_ORDER
+    .map((token) => [token, selectionCounts[token]] as const)
+    .filter(([, count]) => count > 0);
+  const isThreeDifferent = tokenSelection.length === 3 && entries.length === 3 && entries.every(([, count]) => count === 1);
+  const availableElementKinds = ELEMENTS.filter((element) => room.board.bank[element] > 0).length;
+  const isTwoKindsWhenBankSparse = tokenSelection.length === 3
+    && entries.length === 2
+    && availableElementKinds <= 2
+    && entries.some(([, count]) => count === 2);
+  const isPair = tokenSelection.length === 2 && entries.length === 1 && entries[0]?.[1] === 2;
+
+  if (!isThreeDifferent && !isTwoKindsWhenBankSparse && !isPair) {
+    return copy.tokenTakeProblems.invalidPattern;
+  }
+  if (isPair) {
+    const token = entries[0]?.[0];
+    if (token === undefined || room.board.bank[token] < 4) {
+      return copy.tokenTakeProblems.pairRequiresFour;
+    }
+  }
+  for (const [token, count] of entries) {
+    if (room.board.bank[token] < count) {
+      return copy.tokenTakeProblems.bankTokenEmpty(tokenLabel(token, locale));
+    }
+  }
+
+  if (player === undefined) {
+    return null;
+  }
+  const nextTokens = countTokens([]);
+  for (const token of TOKEN_KIND_ORDER) {
+    nextTokens[token] = player.tokens[token] + selectionCounts[token];
+  }
+  const requiredDiscards = Math.max(tokenTotal(nextTokens) - 10, 0);
+  const discardCounts = countTokens(discardSelection);
+  for (const token of TOKEN_KIND_ORDER) {
+    if (discardCounts[token] > nextTokens[token]) {
+      return copy.tokenTakeProblems.invalidTokenDiscard(tokenLabel(token, locale));
+    }
+  }
+  if (discardSelection.length !== requiredDiscards) {
+    if (requiredDiscards === 0) {
+      return copy.tokenTakeProblems.unexpectedTokenDiscard;
+    }
+    return copy.tokenTakeProblems.tokenDiscardRequired(requiredDiscards);
+  }
+  return null;
+}
+
+function describeTokenTakeServerProblem(copy: AppCopy, locale: Locale, error: GameRoomError | null): string | null {
+  if (error === null) {
+    return null;
+  }
+  switch (error.code) {
+    case 'empty_token_selection':
+      return copy.tokenTakeProblems.emptySelection;
+    case 'cannot_take_prism':
+      return copy.tokenTakeProblems.cannotTakePrism;
+    case 'invalid_token_pattern':
+      return copy.tokenTakeProblems.invalidPattern;
+    case 'pair_requires_four':
+      return copy.tokenTakeProblems.pairRequiresFour;
+    case 'bank_token_empty': {
+      const token = TOKEN_KIND_ORDER.find((kind) => error.message.includes(kind));
+      return copy.tokenTakeProblems.bankTokenEmpty(token === undefined ? copy.tokenTakeProblems.thatToken : tokenLabel(token, locale));
+    }
+    case 'token_discard_required':
+      return copy.tokenTakeProblems.serverTokenDiscardRequired(error.message);
+    case 'invalid_token_discard':
+      return copy.tokenTakeProblems.invalidDiscard;
+    case 'unexpected_token_discard':
+      return copy.tokenTakeProblems.unexpectedTokenDiscard;
+    case 'not_current_turn':
+      return copy.tokenTakeProblems.notCurrentTurn;
+    case 'invalid_status':
+      return copy.tokenTakeProblems.notPlaying;
+    default:
+      return copy.tokenTakeProblems.serverFailure(error.message);
+  }
+}
+
 function nextTokenSelection(current: TokenKind[], token: TokenKind): TokenKind[] {
   const next = [...current, token];
   if (next.length > 3) {
@@ -762,6 +910,22 @@ function nextDiscardSelection(current: TokenKind[], token: TokenKind): TokenKind
 
 function futureTokenAllowance(token: TokenKind): number {
   return token === 'prism' ? 1 : 3;
+}
+
+function countTokens(tokens: TokenKind[]): Record<TokenKind, number> {
+  const counts = Object.fromEntries(TOKEN_KIND_ORDER.map((token) => [token, 0])) as Record<TokenKind, number>;
+  for (const token of tokens) {
+    counts[token] += 1;
+  }
+  return counts;
+}
+
+function tokenTotal(tokens: Record<TokenKind, number>): number {
+  return TOKEN_KIND_ORDER.reduce((sum, token) => sum + tokens[token], 0);
+}
+
+function isElementToken(token: TokenKind): boolean {
+  return ELEMENTS.includes(token as (typeof ELEMENTS)[number]);
 }
 
 function buildActionOptions(

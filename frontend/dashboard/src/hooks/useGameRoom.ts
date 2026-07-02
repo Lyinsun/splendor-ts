@@ -13,6 +13,12 @@ interface WsMessage {
   error?: string;
 }
 
+export interface GameRoomError {
+  message: string;
+  code?: string;
+  status?: number;
+}
+
 export function useGameRoom() {
   const [room, setRoom] = useState<GameState | null>(null);
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
@@ -20,6 +26,7 @@ export function useGameRoom() {
   const [localPlayerIds, setLocalPlayerIds] = useState<string[]>(readLocalPlayerIds);
   const [playerName, setPlayerName] = useState<string>(() => localStorage.getItem(NAME_KEY) ?? 'Trainer');
   const [error, setError] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<GameRoomError | null>(null);
   const [busy, setBusy] = useState(false);
   const [connected, setConnected] = useState(false);
 
@@ -63,7 +70,9 @@ export function useGameRoom() {
     try {
       setRooms(await gameApi.listRooms());
     } catch (caught) {
-      setError(errorMessage(caught));
+      const nextError = normalizeError(caught);
+      setLastError(nextError);
+      setError(errorMessage(nextError));
     }
   }, []);
 
@@ -133,7 +142,9 @@ export function useGameRoom() {
         setRoom(message.room);
       }
       if (message.type === 'error') {
-        setError(message.error ?? 'WebSocket error');
+        const nextError = { message: message.error ?? 'WebSocket error' };
+        setLastError(nextError);
+        setError(errorMessage(nextError));
       }
     });
     return () => {
@@ -144,12 +155,15 @@ export function useGameRoom() {
   const run = useCallback(async <T,>(task: () => Promise<T>, after?: (value: T) => void) => {
     setBusy(true);
     setError(null);
+    setLastError(null);
     try {
       const value = await task();
       after?.(value);
       return value;
     } catch (caught) {
-      setError(errorMessage(caught));
+      const nextError = normalizeError(caught);
+      setLastError(nextError);
+      setError(errorMessage(nextError));
       return null;
     } finally {
       setBusy(false);
@@ -231,6 +245,7 @@ export function useGameRoom() {
     isHost,
     busy,
     error,
+    lastError,
     connected,
     setPlayerName,
     selectPlayer,
@@ -276,9 +291,18 @@ function sameIds(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function errorMessage(error: unknown): string {
+function normalizeError(error: unknown): GameRoomError {
   if (error instanceof ApiError) {
-    return error.code === undefined ? error.message : `${error.message} (${error.code})`;
+    return error.code === undefined
+      ? { message: error.message, status: error.status }
+      : { message: error.message, status: error.status, code: error.code };
   }
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) {
+    return { message: error.message };
+  }
+  return { message: String(error) };
+}
+
+function errorMessage(error: GameRoomError): string {
+  return error.code === undefined ? error.message : `${error.message} (${error.code})`;
 }

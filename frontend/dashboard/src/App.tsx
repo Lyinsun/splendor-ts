@@ -1,8 +1,9 @@
-import { Copy, Gem, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users } from 'lucide-react';
-import { type CSSProperties, useState } from 'react';
+import { CircleHelp, Copy, Gem, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users } from 'lucide-react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import type { ActionOptions, CardSource, CardTier, CompanionCard, ElementCost, EvolutionSelection, GameState, PlayerState, SpecialCardRank, TokenKind } from './api/types';
 import { ELEMENTS } from './api/types';
 import { useGameRoom, type GameRoomError } from './hooks/useGameRoom';
+import { HelpModal, hasSeenTutorial, type HelpTab } from './HelpModal';
 import {
   APP_COPY,
   LOCALE_OPTIONS,
@@ -46,6 +47,15 @@ export function App() {
   const [discardSelection, setDiscardSelection] = useState<TokenKind[]>([]);
   const [evolutionSelection, setEvolutionSelection] = useState<EvolutionSelection | null>(null);
   const [lastActionContext, setLastActionContext] = useState<ActionContext>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpInitialTab, setHelpInitialTab] = useState<HelpTab>('quickStart');
+
+  useEffect(() => {
+    if (!hasSeenTutorial()) {
+      setHelpInitialTab('quickStart');
+      setHelpOpen(true);
+    }
+  }, []);
 
   const room = game.room;
   const myPlayer = game.currentPlayer;
@@ -119,6 +129,9 @@ export function App() {
             onThemeChange={handleThemeChange}
           />
           <StatusPill label={game.connected ? copy.liveSync : copy.offlineSync} tone={game.connected ? 'good' : 'muted'} />
+          <button className="icon-button" type="button" onClick={() => { setHelpInitialTab('quickStart'); setHelpOpen(true); }} title={copy.help}>
+            <CircleHelp size={18} />
+          </button>
           <button className="icon-button" type="button" onClick={() => void game.refreshRooms()} disabled={game.busy} title={copy.refreshRooms}>
             <RefreshCw size={18} />
           </button>
@@ -201,6 +214,7 @@ export function App() {
           onBuy={(source) => void handleBuy(source)}
         />
       )}
+      <HelpModal open={helpOpen} initialTab={helpInitialTab} locale={locale} copy={copy as unknown as Record<string, unknown>} onClose={() => setHelpOpen(false)} />
     </main>
   );
 }

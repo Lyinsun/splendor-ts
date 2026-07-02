@@ -1127,3 +1127,337 @@ label {
     grid-template-columns: 1fr;
   }
 }
+
+/* Help / Tutorial Modal */
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.help-modal {
+  width: 100%;
+  max-width: 720px;
+  max-height: 85vh;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #1e2330;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.help-header h3 {
+  font-size: 18px;
+}
+
+.help-close {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #aeb7c4;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.help-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f5f7fb;
+}
+
+.help-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.help-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #aeb7c4;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 36px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.help-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5f7fb;
+}
+
+.help-tab.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.help-tab svg {
+  flex-shrink: 0;
+}
+
+.help-tab-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  min-height: 0;
+}
+
+.help-section {
+  display: grid;
+  gap: 18px;
+}
+
+.help-intro {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #d0d6df;
+}
+
+.help-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 14px;
+  counter-reset: help-step;
+}
+
+.help-steps li {
+  counter-increment: help-step;
+  position: relative;
+  padding: 14px 16px 14px 48px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.help-steps li::before {
+  content: counter(help-step);
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 13px;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+}
+
+.help-steps li strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.help-steps li p {
+  font-size: 13px;
+  color: #aeb7c4;
+  line-height: 1.5;
+}
+
+.help-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: #e8e4d0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.help-tip svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+.help-rule-block,
+.help-ui-block {
+  display: grid;
+  gap: 8px;
+}
+
+.help-rule-block h4,
+.help-ui-block h4 {
+  font-size: 15px;
+  color: var(--accent);
+  font-weight: 800;
+  margin: 0;
+}
+
+.help-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.help-items li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.help-items li strong {
+  font-size: 13px;
+  color: #e8ecf2;
+}
+
+.help-items li span {
+  font-size: 12px;
+  color: #aeb7c4;
+  line-height: 1.45;
+}
+
+.help-ui-block p {
+  font-size: 13px;
+  color: #c4ccd7;
+  line-height: 1.55;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.help-faq-list {
+  display: grid;
+  gap: 8px;
+}
+
+.help-faq-item {
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.help-faq-item summary {
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: #e8ecf2;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s;
+}
+
+.help-faq-item summary::before {
+  content: 'Q';
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 11px;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.help-faq-item summary:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.help-faq-item[open] summary {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.help-faq-item p {
+  padding: 12px 16px 14px 44px;
+  font-size: 13px;
+  color: #aeb7c4;
+  line-height: 1.55;
+}
+
+.help-footer {
+  padding: 12px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.help-dont-show {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #aeb7c4;
+  cursor: pointer;
+}
+
+.help-dont-show input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  accent-color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .help-overlay {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .help-modal {
+    max-height: 92vh;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .help-tab-content {
+    padding: 16px 18px;
+  }
+
+  .help-steps li {
+    padding-left: 42px;
+  }
+}

@@ -263,6 +263,108 @@ export const APP_COPY = {
     } satisfies Record<GameState['status'], string>,
     roomMeta: (players: number, round: number, turn: number) => `${players} 位训练师 · 第 ${round} 轮 · 第 ${turn} 回合`,
     playerCount: (players: number, maxPlayers: number, status: GameState['status']) => `${players}/${maxPlayers} 位训练师 · ${APP_COPY['zh-CN'].roomStatus[status]}`,
+    help: '帮助',
+    helpTitle: '游戏帮助',
+    helpTabs: {
+      quickStart: '新手指引',
+      rules: '游戏规则',
+      uiGuide: '界面说明',
+      faq: '常见问题',
+    },
+    closeHelp: '关闭',
+    dontShowAgain: '不再自动显示',
+    quickStart: {
+      intro: '欢迎来到宝可梦璀璨宝石！以下三步带你快速上手：',
+      steps: [
+        {
+          title: '第 1 步：创建或加入房间',
+          body: '在大厅输入你的训练师名称和房间名，点击「创建房间」。如果已有房间，直接在右侧列表点击「加入」。',
+        },
+        {
+          title: '第 2 步：开始游戏',
+          body: '房主可以点击「添加本地玩家」加入 AI 对手，或邀请朋友在另一个浏览器窗口加入房间。至少 2 位玩家后，点击「开始」进入游戏。',
+        },
+        {
+          title: '第 3 步：进行回合',
+          body: '轮到你时，可以从精灵球供应区拿球、保留卡牌或捕获卡牌。目标是通过捕获宝可梦和获得训练师徽章来积累分数，率先达到 18 分触发终局轮！',
+        },
+      ],
+      tip: '提示：拿球时可以选择 3 种不同精灵球，或 2 枚相同精灵球（银行需剩余 ≥ 4 枚）。',
+    },
+    rules: {
+      sections: [
+        {
+          title: '精灵球种类',
+          items: [
+            { name: '精灵球（火）', desc: '红色基础资源，用于捕获火属性宝可梦。' },
+            { name: '超级球（水）', desc: '蓝色基础资源，用于捕获水属性宝可梦。' },
+            { name: '高级球（草）', desc: '绿色基础资源，用于捕获草属性宝可梦。' },
+            { name: '先机球（电）', desc: '黄色基础资源，用于捕获电属性宝可梦。' },
+            { name: '治愈球（超能力）', desc: '粉色基础资源，用于捕获超能力属性宝可梦。' },
+            { name: '大师球', desc: '万能资源，可代替任意属性支付。保留卡牌时获得 1 枚。' },
+          ],
+        },
+        {
+          title: '回合行动（每回合选其一）',
+          items: [
+            { name: '拿取精灵球', desc: '从银行拿取精灵球。可选 3 种不同球，或 2 枚相同球（银行该球需 ≥ 4 枚）。拿球后总数不能超过 10 枚，超出需弃球。' },
+            { name: '保留卡牌', desc: '从市场或牌堆顶保留一张卡牌到保留区，同时获得 1 枚大师球（如果银行还有）。最多保留 3 张。' },
+            { name: '捕获卡牌', desc: '支付卡牌费用（可用已捕获宝可梦的属性加成抵扣），将其加入队伍。特殊卡需要大师球。' },
+          ],
+        },
+        {
+          title: '进化机制',
+          items: [
+            { name: '进化条件', desc: '回合结束时，如果你已捕获的宝可梦满足进化的属性加成要求，可以选择将其进化为更高阶段的卡牌。' },
+            { name: '进化效果', desc: '进化后的卡牌替换原卡，原卡的分数和属性加成不再计入，但进化记录可在平局时作为判定依据。' },
+          ],
+        },
+        {
+          title: '特殊卡区',
+          items: [
+            { name: '罕见卡', desc: 'Eevee、Snorlax 等，0 分但提供 2 点属性加成，捕获需要 1 枚大师球。' },
+            { name: '传说卡', desc: 'Mewtwo、闪电鸟等，2 分 + 2 点属性加成，捕获需要 1 枚大师球。' },
+          ],
+        },
+        {
+          title: '训练师徽章',
+          items: [
+            { name: '自动获得', desc: '当你的属性加成满足训练师人物的要求时，该训练师自动加入你的队伍并提供额外分数。' },
+          ],
+        },
+        {
+          title: '终局与胜负',
+          items: [
+            { name: '终局轮触发', desc: '任意玩家分数达到 18 分时，当前回合结束后进入终局轮。所有玩家再进行最后一个回合。' },
+            { name: '胜负判定', desc: '终局轮结束后分数最高者获胜。平局时依次比较：进化记录数 → 在场宝可梦数量。' },
+          ],
+        },
+      ],
+    },
+    uiGuide: {
+      sections: [
+        { title: '精灵球供应', desc: '左侧面板。点击精灵球按钮选择要拿取的组合，然后点击「拿取」按钮执行。大师球不能直接拿取。' },
+        { title: '回合结算', desc: '精灵球供应下方。如果拿球后超过 10 枚，需要在此选择要弃掉的球。还可以选择是否进行进化。' },
+        { title: '卡牌市场', desc: '中央区域。按等级 1/2/3 排列，每行 4 张公开卡 + 牌堆。点击「保留」或「购买」操作卡牌。' },
+        { title: '特殊卡区', desc: '右侧上方。罕见和传说卡各展示 1 张，需要大师球才能捕获。' },
+        { title: '训练师人物', desc: '右侧下方。展示当前可获得的训练师徽章及其属性要求。' },
+        { title: '保留区与战斗日志', desc: '最右侧面板。显示你保留的卡牌（可购买）和最近的战斗行动记录。' },
+        { title: '训练师列表', desc: '左侧面板。显示所有玩家的分数、属性加成、精灵球数量和进化记录。当前回合玩家有金色边框。' },
+        { title: '控制席位', desc: '在本地多人模式下，你可以通过下拉菜单切换控制哪个玩家的回合。' },
+      ],
+    },
+    faq: {
+      items: [
+        { q: '为什么操作按钮是灰色的？', a: '按钮灰色表示当前不可操作。可能原因：1) 不是你的回合；2) 游戏还没开始或已结束；3) 正在结算上一个操作。' },
+        { q: '怎么获得大师球？', a: '大师球只能通过保留卡牌获得。每次保留一张卡牌时，如果银行还有大师球，你会获得 1 枚。' },
+        { q: '拿球后超过 10 枚怎么办？', a: '在「回合结算」区域选择要弃掉的精灵球，选够数量后再点击「拿取」按钮。' },
+        { q: '为什么我不能买这张卡？', a: '检查你是否有足够的精灵球（含属性加成抵扣）。特殊卡（罕见/传说）还额外需要 1 枚大师球。' },
+        { q: '属性加成有什么用？', a: '每捕获一张宝可梦卡，你会获得对应属性的永久加成。购买卡牌时，加成可以抵扣对应属性的费用。' },
+        { q: '保留卡牌有上限吗？', a: '最多保留 3 张卡牌。保留区的卡牌可以随时购买。' },
+        { q: '怎么和朋友一起玩？', a: '创建房间后，让朋友在同一网络下访问同一个地址（默认端口 19988），在房间列表中加入即可。' },
+        { q: '终局轮是什么？', a: '当任意玩家达到 18 分时触发。当前回合结束后，所有玩家再进行最后一个回合，然后结算胜负。' },
+      ],
+    },
   },
   'en-US': {
     appTitle: 'Pokemon Splendor',
@@ -348,6 +450,108 @@ export const APP_COPY = {
     } satisfies Record<GameState['status'], string>,
     roomMeta: (players: number, round: number, turn: number) => `${players} trainers · round ${round} · turn ${turn}`,
     playerCount: (players: number, maxPlayers: number, status: GameState['status']) => `${players}/${maxPlayers} trainers · ${APP_COPY['en-US'].roomStatus[status]}`,
+    help: 'Help',
+    helpTitle: 'Game Help',
+    helpTabs: {
+      quickStart: 'Quick Start',
+      rules: 'Game Rules',
+      uiGuide: 'UI Guide',
+      faq: 'FAQ',
+    },
+    closeHelp: 'Close',
+    dontShowAgain: "Don't show again",
+    quickStart: {
+      intro: 'Welcome to Pokemon Splendor! Get started in three steps:',
+      steps: [
+        {
+          title: 'Step 1: Create or join a room',
+          body: 'Enter your trainer name and a room name, then click "Create room". If a room already exists, click "Join" in the list on the right.',
+        },
+        {
+          title: 'Step 2: Start the game',
+          body: 'The host can click "Add local player" to add an AI opponent, or invite a friend to join from another browser window. With at least 2 players, click "Start" to begin.',
+        },
+        {
+          title: 'Step 3: Take your turn',
+          body: 'On your turn, take balls from the supply, reserve a card, or capture a card. The goal is to reach 18 points by capturing Pokemon and earning trainer badges to trigger the final round!',
+        },
+      ],
+      tip: 'Tip: When taking balls, choose 3 different kinds or 2 of the same kind (requires ≥ 4 of that ball in the bank).',
+    },
+    rules: {
+      sections: [
+        {
+          title: 'Ball Types',
+          items: [
+            { name: 'Poke Ball (Fire)', desc: 'Red basic resource. Used to capture Fire-type Pokemon.' },
+            { name: 'Great Ball (Water)', desc: 'Blue basic resource. Used to capture Water-type Pokemon.' },
+            { name: 'Ultra Ball (Grass)', desc: 'Green basic resource. Used to capture Grass-type Pokemon.' },
+            { name: 'Quick Ball (Electric)', desc: 'Yellow basic resource. Used to capture Electric-type Pokemon.' },
+            { name: 'Heal Ball (Psychic)', desc: 'Pink basic resource. Used to capture Psychic-type Pokemon.' },
+            { name: 'Master Ball', desc: 'Wildcard resource that pays for any element. Gain 1 by reserving a card.' },
+          ],
+        },
+        {
+          title: 'Turn Actions (choose one per turn)',
+          items: [
+            { name: 'Take Balls', desc: 'Take balls from the bank. Choose 3 different kinds, or 2 of the same kind (bank must have ≥ 4 of that ball). Total cannot exceed 10; discard excess in settlement.' },
+            { name: 'Reserve Card', desc: 'Reserve a card from the market or deck top to your reserve area. Gain 1 Master Ball if available. Max 3 reserved.' },
+            { name: 'Capture Card', desc: 'Pay the card cost (bonuses from captured Pokemon reduce the cost) and add it to your team. Special cards require a Master Ball.' },
+          ],
+        },
+        {
+          title: 'Evolution',
+          items: [
+            { name: 'Evolution Requirement', desc: 'At end of turn, if a captured Pokemon meets the element bonus requirement of its evolution target, you may evolve it.' },
+            { name: 'Evolution Effect', desc: 'The evolved card replaces the source. The source card\'s points and bonuses no longer count, but the evolution record helps break ties.' },
+          ],
+        },
+        {
+          title: 'Special Cards',
+          items: [
+            { name: 'Rare', desc: 'Eevee, Snorlax, etc. 0 points but +2 element bonus. Requires 1 Master Ball to capture.' },
+            { name: 'Legendary', desc: 'Mewtwo, Moltres, etc. 2 points + 2 element bonus. Requires 1 Master Ball to capture.' },
+          ],
+        },
+        {
+          title: 'Trainer Badges',
+          items: [
+            { name: 'Auto-Award', desc: 'When your element bonuses meet a Gym Leader\'s requirement, they automatically join your team and add points.' },
+          ],
+        },
+        {
+          title: 'End Game & Winning',
+          items: [
+            { name: 'Final Round Trigger', desc: 'When any player reaches 18 points, the current round ends and the final round begins. All players get one last turn.' },
+            { name: 'Tiebreakers', desc: 'Highest score wins. Ties broken by: most evolution records → most Pokemon in play.' },
+          ],
+        },
+      ],
+    },
+    uiGuide: {
+      sections: [
+        { title: 'Ball Supply', desc: 'Left panel. Click ball buttons to select your take combination, then click "Take". Master Balls cannot be taken directly.' },
+        { title: 'Turn Settlement', desc: 'Below the ball supply. If taking would exceed 10 balls, select which to discard here. You may also choose an evolution.' },
+        { title: 'Card Market', desc: 'Center area. Tiers 1/2/3 each show 4 face-up cards plus a deck. Click "Reserve" or "Buy" on a card.' },
+        { title: 'Special Cards', desc: 'Upper right. Rare and Legendary cards each show 1 face-up. Requires a Master Ball to capture.' },
+        { title: 'Trainer Tiles', desc: 'Lower right. Shows available Gym Leader badges and their element requirements.' },
+        { title: 'Reserve & Battle Log', desc: 'Rightmost panel. Shows your reserved cards (buyable) and recent battle action records.' },
+        { title: 'Trainer List', desc: 'Left panel. Shows all players\' scores, bonuses, ball counts, and evolution records. The active turn player has a gold border.' },
+        { title: 'Control Seat', desc: 'In local multi-seat mode, switch which player you control via the dropdown.' },
+      ],
+    },
+    faq: {
+      items: [
+        { q: 'Why are the action buttons grayed out?', a: 'Buttons are disabled when: 1) It\'s not your turn; 2) The game hasn\'t started or has ended; 3) The previous action is still settling.' },
+        { q: 'How do I get Master Balls?', a: 'Master Balls are only obtained by reserving cards. Each time you reserve a card, you gain 1 Master Ball if any remain in the bank.' },
+        { q: 'What if I exceed 10 balls after taking?', a: 'Select the balls to discard in the "Turn Settlement" area, then click "Take" once the required number is selected.' },
+        { q: 'Why can\'t I buy this card?', a: 'Check if you have enough balls (including element bonus deductions). Special cards (Rare/Legendary) also require 1 Master Ball.' },
+        { q: 'What do element bonuses do?', a: 'Each captured Pokemon gives a permanent element bonus. When buying cards, bonuses reduce the cost of matching elements.' },
+        { q: 'Is there a limit on reserved cards?', a: 'You can reserve up to 3 cards. Reserved cards can be purchased at any time on your turn.' },
+        { q: 'How do I play with friends?', a: 'Create a room and have your friend visit the same address (default port 19988) on the same network. They can join from the room list.' },
+        { q: 'What is the final round?', a: 'Triggered when any player reaches 18 points. After the current turn ends, all players get one last turn before scoring determines the winner.' },
+      ],
+    },
   },
 } as const;
 

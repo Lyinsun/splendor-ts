@@ -7,6 +7,12 @@ const PLAYER_KEY = 'splendor-monsters-player-id';
 const LOCAL_PLAYERS_KEY = 'splendor-monsters-local-player-ids';
 const NAME_KEY = 'splendor-monsters-player-name';
 
+const safeStorage = {
+  get(key: string): string | null { try { return localStorage.getItem(key); } catch { return null; } },
+  set(key: string, value: string): void { try { localStorage.setItem(key, value); } catch { /* ignore */ } },
+  remove(key: string): void { try { localStorage.removeItem(key); } catch { /* ignore */ } },
+};
+
 interface WsMessage {
   type: 'room_state' | 'error';
   room?: GameState;
@@ -22,9 +28,9 @@ export interface GameRoomError {
 export function useGameRoom() {
   const [room, setRoom] = useState<GameState | null>(null);
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
-  const [playerId, setPlayerId] = useState<string>(() => localStorage.getItem(PLAYER_KEY) ?? '');
+  const [playerId, setPlayerId] = useState<string>(() => safeStorage.get(PLAYER_KEY) ?? '');
   const [localPlayerIds, setLocalPlayerIds] = useState<string[]>(readLocalPlayerIds);
-  const [playerName, setPlayerName] = useState<string>(() => localStorage.getItem(NAME_KEY) ?? 'Trainer');
+  const [playerName, setPlayerName] = useState<string>(() => safeStorage.get(NAME_KEY) ?? 'Trainer');
   const [error, setError] = useState<string | null>(null);
   const [lastError, setLastError] = useState<GameRoomError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -39,9 +45,9 @@ export function useGameRoom() {
   const setControlledPlayerId = useCallback((nextPlayerId: string) => {
     setPlayerId(nextPlayerId);
     if (nextPlayerId === '') {
-      localStorage.removeItem(PLAYER_KEY);
+      safeStorage.remove(PLAYER_KEY);
     } else {
-      localStorage.setItem(PLAYER_KEY, nextPlayerId);
+      safeStorage.set(PLAYER_KEY, nextPlayerId);
     }
   }, []);
 
@@ -77,7 +83,7 @@ export function useGameRoom() {
   }, []);
 
   const restoreRoom = useCallback(async () => {
-    const storedRoomId = localStorage.getItem(ROOM_KEY);
+    const storedRoomId = safeStorage.get(ROOM_KEY);
     if (storedRoomId === null) {
       return;
     }
@@ -85,11 +91,12 @@ export function useGameRoom() {
       const restoredRoom = await gameApi.getRoom(storedRoomId);
       setRoom(restoredRoom);
     } catch {
-      localStorage.removeItem(ROOM_KEY);
-      localStorage.removeItem(PLAYER_KEY);
-      localStorage.removeItem(LOCAL_PLAYERS_KEY);
+      safeStorage.remove(ROOM_KEY);
+      safeStorage.remove(PLAYER_KEY);
+      safeStorage.remove(LOCAL_PLAYERS_KEY);
       setPlayerId('');
       setLocalPlayerIds([]);
+      setError('你之前的游戏房间已不存在，已返回大厅');
     }
   }, []);
 
@@ -159,14 +166,20 @@ export function useGameRoom() {
       });
 
       socket.addEventListener('message', (event) => {
-        const message = JSON.parse(String(event.data)) as WsMessage;
-        if (message.type === 'room_state' && message.room !== undefined) {
-          setRoom(message.room);
-        }
-        if (message.type === 'error') {
-          const nextError = { message: message.error ?? 'WebSocket error' };
-          setLastError(nextError);
-          setError(errorMessage(nextError));
+        try {
+          const data = JSON.parse(String(event.data));
+          const message = data as WsMessage;
+          if (message.type === 'room_state' && message.room !== undefined) {
+            setRoom(message.room);
+          }
+          if (message.type === 'error') {
+            const nextError = { message: message.error ?? 'WebSocket error' };
+            setLastError(nextError);
+            setError(errorMessage(nextError));
+          }
+        } catch {
+          console.warn('[WS] Failed to parse message');
+          return;
         }
       });
     };
@@ -206,31 +219,31 @@ export function useGameRoom() {
   }, [refreshRooms]);
 
   const createRoom = useCallback(async (input: { playerName: string; roomName?: string }) => {
-    localStorage.setItem(NAME_KEY, input.playerName);
+    safeStorage.set(NAME_KEY, input.playerName);
     setPlayerName(input.playerName);
     await run(() => gameApi.createRoom(input), (result) => {
       setRoom(result.room);
       setControlledPlayerId(result.playerId);
       replaceLocalPlayerIds([result.playerId]);
-      localStorage.setItem(ROOM_KEY, result.room.roomId);
+      safeStorage.set(ROOM_KEY, result.room.roomId);
     });
   }, [replaceLocalPlayerIds, run, setControlledPlayerId]);
 
   const joinRoom = useCallback(async (roomId: string, name = playerName) => {
-    localStorage.setItem(NAME_KEY, name);
+    safeStorage.set(NAME_KEY, name);
     setPlayerName(name);
     await run(() => gameApi.joinRoom(roomId, name), (result) => {
       setRoom(result.room);
       setControlledPlayerId(result.playerId);
       replaceLocalPlayerIds([result.playerId]);
-      localStorage.setItem(ROOM_KEY, result.room.roomId);
+      safeStorage.set(ROOM_KEY, result.room.roomId);
     });
   }, [playerName, replaceLocalPlayerIds, run, setControlledPlayerId]);
 
   const leaveLocalRoom = useCallback(() => {
-    localStorage.removeItem(ROOM_KEY);
-    localStorage.removeItem(PLAYER_KEY);
-    localStorage.removeItem(LOCAL_PLAYERS_KEY);
+    safeStorage.remove(ROOM_KEY);
+    safeStorage.remove(PLAYER_KEY);
+    safeStorage.remove(LOCAL_PLAYERS_KEY);
     setRoom(null);
     setPlayerId('');
     setLocalPlayerIds([]);
@@ -296,9 +309,9 @@ export function useGameRoom() {
 }
 
 function readLocalPlayerIds(): string[] {
-  const raw = localStorage.getItem(LOCAL_PLAYERS_KEY);
+  const raw = safeStorage.get(LOCAL_PLAYERS_KEY);
   if (raw === null) {
-    const legacyPlayerId = localStorage.getItem(PLAYER_KEY);
+    const legacyPlayerId = safeStorage.get(PLAYER_KEY);
     return legacyPlayerId === null ? [] : [legacyPlayerId];
   }
   try {
@@ -311,10 +324,10 @@ function readLocalPlayerIds(): string[] {
 
 function writeLocalPlayerIds(playerIds: string[]): void {
   if (playerIds.length === 0) {
-    localStorage.removeItem(LOCAL_PLAYERS_KEY);
+    safeStorage.remove(LOCAL_PLAYERS_KEY);
     return;
   }
-  localStorage.setItem(LOCAL_PLAYERS_KEY, JSON.stringify(unique(playerIds)));
+  safeStorage.set(LOCAL_PLAYERS_KEY, JSON.stringify(unique(playerIds)));
 }
 
 function unique(playerIds: string[]): string[] {

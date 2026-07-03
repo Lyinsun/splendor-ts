@@ -57,19 +57,31 @@ interface RequestOptions {
 }
 
 async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
   const init: RequestInit = {
     method: options.method ?? 'GET',
+    signal: controller.signal,
   };
   if (options.body !== undefined) {
     init.headers = { 'Content-Type': 'application/json' };
     init.body = JSON.stringify(options.body);
   }
-  const response = await fetch(url, init);
-  const payload = await response.json().catch(() => undefined);
-  if (!response.ok) {
-    const message = payload !== undefined && typeof payload === 'object' && 'error' in payload ? String(payload.error) : response.statusText;
-    const code = payload !== undefined && typeof payload === 'object' && 'error_code' in payload ? String(payload.error_code) : undefined;
-    throw new ApiError(message, response.status, code);
+  try {
+    const response = await fetch(url, init);
+    const payload = await response.json().catch(() => undefined);
+    if (!response.ok) {
+      const message = payload !== undefined && typeof payload === 'object' && 'error' in payload ? String(payload.error) : response.statusText;
+      const code = payload !== undefined && typeof payload === 'object' && 'error_code' in payload ? String(payload.error_code) : undefined;
+      throw new ApiError(message, response.status, code);
+    }
+    return payload as T;
+  } catch (caught) {
+    if (caught instanceof Error && caught.name === 'AbortError') {
+      throw new ApiError('请求超时，请稍后重试', 408, 'timeout');
+    }
+    throw caught;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return payload as T;
 }

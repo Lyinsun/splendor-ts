@@ -61,6 +61,7 @@ select {
   --accent-contrast: #1a1710;
   --accent-border: rgba(255, 236, 122, 0.82);
   --active-border: rgba(246, 212, 73, 0.9);
+  --text-muted: #aeb7c4;
   --hero-image: url("/assets/splendor-monsters/themes/pokemon-splendor/arena-hero.png");
   width: min(1480px, calc(100vw - 32px));
   margin: 0 auto;
@@ -86,6 +87,13 @@ select {
   --accent-contrast: #181007;
   --accent-border: rgba(255, 224, 128, 0.84);
   --active-border: rgba(245, 200, 75, 0.9);
+}
+
+.theme-elemental-league {
+  --accent: #a78bfa;
+  --accent-contrast: #0f0a1a;
+  --accent-border: rgba(196, 181, 253, 0.82);
+  --active-border: rgba(167, 139, 250, 0.9);
 }
 
 .topbar,

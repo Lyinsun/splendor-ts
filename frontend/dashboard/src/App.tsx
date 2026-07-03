@@ -25,6 +25,11 @@ import {
 
 const LOCALE_KEY = 'splendor-monsters-locale';
 const THEME_KEY = 'splendor-monsters-theme';
+
+const safeStorage = {
+  get(key: string): string | null { try { return localStorage.getItem(key); } catch { return null; } },
+  set(key: string, value: string): void { try { localStorage.setItem(key, value); } catch { /* ignore */ } },
+};
 const TOKEN_KIND_ORDER = ['fire', 'water', 'grass', 'electric', 'psychic', 'prism'] satisfies TokenKind[];
 const EVOLUTION_TIERS = [2, 3] satisfies CardTier[];
 
@@ -37,8 +42,8 @@ interface EvolutionCandidate {
 
 export function App() {
   const game = useGameRoom();
-  const [locale, setLocaleState] = useState<Locale>(() => normalizeLocale(localStorage.getItem(LOCALE_KEY), browserDefaultLocale()));
-  const [themeId, setThemeIdState] = useState<ThemeId>(() => normalizeThemeId(localStorage.getItem(THEME_KEY)));
+  const [locale, setLocaleState] = useState<Locale>(() => normalizeLocale(safeStorage.get(LOCALE_KEY), browserDefaultLocale()));
+  const [themeId, setThemeIdState] = useState<ThemeId>(() => normalizeThemeId(safeStorage.get(THEME_KEY)));
   const copy = APP_COPY[locale];
   const theme = THEMES[themeId];
   const [draftName, setDraftName] = useState(game.playerName);
@@ -71,7 +76,7 @@ export function App() {
 
   const handleLocaleChange = (nextLocale: Locale) => {
     setLocaleState(nextLocale);
-    localStorage.setItem(LOCALE_KEY, nextLocale);
+    safeStorage.set(LOCALE_KEY, nextLocale);
     if (isDefaultRoomName(roomName)) {
       setRoomName(theme.defaultRoomName[nextLocale]);
     }
@@ -80,7 +85,7 @@ export function App() {
   const handleThemeChange = (nextThemeId: ThemeId) => {
     const nextTheme = THEMES[nextThemeId];
     setThemeIdState(nextThemeId);
-    localStorage.setItem(THEME_KEY, nextThemeId);
+    safeStorage.set(THEME_KEY, nextThemeId);
     if (isDefaultRoomName(roomName)) {
       setRoomName(nextTheme.defaultRoomName[locale]);
     }
@@ -381,7 +386,7 @@ function GameTable(props: {
               active={props.room.currentPlayerId === player.id}
               controlled={props.playerId === player.id}
               local={props.localPlayerIds.includes(player.id)}
-              targetScore={15}
+              targetScore={props.room.targetScore ?? 18}
             />
           ))}
         </div>
@@ -793,7 +798,7 @@ function CompanionCardView(props: {
       aria-label={`${text.name}, ${props.card.points} ${props.copy.glory}, ${tokenLabel(props.card.element, props.locale)} type`}
     >
       <div className={`card-art ${cardArtClass}`}>
-        {art === null ? <span>{text.species.slice(0, 1)}</span> : <img src={art.src} alt={art.alt} loading="lazy" />}
+        {art === null ? <span>{text.species.slice(0, 1)}</span> : <img src={art.src} alt={art.alt} loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
         <span className="card-element-indicator" style={{ background: elementColor }} title={`${tokenLabel(props.card.element, props.locale)} ${props.copy.type}`} />
       </div>
       <div className="card-body">
@@ -815,7 +820,7 @@ function CompanionCardView(props: {
 
 function PlayerPanel(props: { copy: AppCopy; locale: Locale; player: PlayerState; active: boolean; controlled: boolean; local: boolean; targetScore?: number }) {
   const badge = props.controlled ? props.copy.controlled : props.local ? props.copy.localSeat : null;
-  const target = props.targetScore ?? 15;
+  const target = props.targetScore ?? 18;
   const progress = Math.min(100, Math.round((props.player.score / target) * 100));
   return (
     <article className={`player-panel ${props.active ? 'active' : ''} ${props.controlled ? 'controlled' : ''} ${props.local ? 'local' : ''}`}>

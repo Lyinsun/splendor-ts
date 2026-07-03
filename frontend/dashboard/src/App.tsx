@@ -1,4 +1,4 @@
-import { CircleHelp, Copy, Gem, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users } from 'lucide-react';
+import { CircleHelp, Copy, Gem, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users, X } from 'lucide-react';
 import { type CSSProperties, useEffect, useState } from 'react';
 import type { ActionOptions, CardSource, CardTier, CompanionCard, ElementCost, EvolutionSelection, GameState, PlayerState, SpecialCardRank, TokenKind } from './api/types';
 import { ELEMENTS } from './api/types';
@@ -49,6 +49,7 @@ export function App() {
   const [lastActionContext, setLastActionContext] = useState<ActionContext>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpInitialTab, setHelpInitialTab] = useState<HelpTab>('quickStart');
+  const [errorDismissed, setErrorDismissed] = useState(false);
 
   useEffect(() => {
     if (!hasSeenTutorial()) {
@@ -60,6 +61,13 @@ export function App() {
   const room = game.room;
   const myPlayer = game.currentPlayer;
   const appStyle = { '--hero-image': `url("${theme.assets.hero.src}")` } as CSSProperties;
+
+  // Reset dismiss when a new error arrives.
+  useEffect(() => {
+    if (game.error !== null) {
+      setErrorDismissed(false);
+    }
+  }, [game.error]);
 
   const handleLocaleChange = (nextLocale: Locale) => {
     setLocaleState(nextLocale);
@@ -138,7 +146,21 @@ export function App() {
         </div>
       </header>
 
-      {game.error !== null && <div className="error-banner">{game.error}</div>}
+      {game.error !== null && !errorDismissed && (
+        <div className="error-banner" role="alert">
+          <span>{game.error}</span>
+          <button type="button" onClick={() => setErrorDismissed(true)} aria-label={copy.dismiss}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {room !== null && !game.connected && (
+        <div className="reconnect-banner" role="status">
+          <span className="spinner" />
+          <span>{copy.reconnecting}</span>
+        </div>
+      )}
 
       <section className={`hero-panel ${room === null ? 'lobby-hero' : 'match-panel'}`} aria-label={theme.assets.hero.alt[locale]}>
         <div className="hero-copy">
@@ -274,7 +296,7 @@ function Lobby(props: {
           <input value={props.roomName} onChange={(event) => props.onRoomNameChange(event.target.value)} />
         </label>
         <button type="button" className="primary-button" onClick={props.onCreate} disabled={props.busy}>
-          <Users size={18} /> {props.copy.createRoom}
+          {props.busy ? <span className="spinner" /> : <Users size={18} />} {props.copy.createRoom}
         </button>
       </div>
       <div className="panel room-list">
@@ -359,6 +381,7 @@ function GameTable(props: {
               active={props.room.currentPlayerId === player.id}
               controlled={props.playerId === player.id}
               local={props.localPlayerIds.includes(player.id)}
+              targetScore={15}
             />
           ))}
         </div>
@@ -368,7 +391,7 @@ function GameTable(props: {
               <ShieldPlus size={16} /> {props.copy.demoRival}
             </button>
             <button type="button" className="primary-button" onClick={props.onStart} disabled={props.busy || !props.isHost || props.room.players.length < 2}>
-              <Play size={18} /> {props.copy.start}
+              {props.busy ? <span className="spinner" /> : <Play size={18} />} {props.copy.start}
             </button>
           </div>
         ) : null}
@@ -376,7 +399,7 @@ function GameTable(props: {
       </aside>
 
       <section className="play-area standard-field">
-        <div className="panel turn-panel">
+        <div className={`panel turn-panel${props.isMyTurn && props.room.status === 'playing' ? ' is-my-turn' : ''}`}>
           <div>
             <p className="eyebrow">{props.copy.currentTurn}</p>
             <h3>{props.room.status === 'playing' ? props.activePlayerName : props.copy.roomStatus[props.room.status]}</h3>
@@ -424,6 +447,7 @@ function GameTable(props: {
                 room={props.room}
                 player={props.myPlayer}
                 disabled={actionDisabled}
+                busy={props.busy}
                 disabledReason={actionDisabledReason}
                 lastTakeError={props.lastTakeError}
                 tokenSelection={props.tokenSelection}
@@ -564,6 +588,7 @@ function BankPanel(props: {
   room: GameState;
   player: PlayerState | undefined;
   disabled: boolean;
+  busy: boolean;
   disabledReason: string | null;
   lastTakeError: GameRoomError | null;
   tokenSelection: TokenKind[];
@@ -577,6 +602,7 @@ function BankPanel(props: {
   const serverProblem = describeTokenTakeServerProblem(props.copy, props.locale, props.lastTakeError);
   const takeProblem = props.disabledReason ?? selectionProblem ?? serverProblem;
   const takeDisabled = props.disabled || props.tokenSelection.length === 0 || selectionProblem !== null;
+  const selectionCounts = countTokens(props.tokenSelection);
   return (
     <section className="panel bank-panel">
       <div>
@@ -584,19 +610,25 @@ function BankPanel(props: {
         <p>{selectionText}</p>
       </div>
       <div className="bank-tokens">
-        {(['fire', 'water', 'grass', 'electric', 'psychic'] satisfies TokenKind[]).map((token) => (
-          <button
-            type="button"
-            className={`token-button ${tokenClassName(token)}`}
-            key={token}
-            disabled={props.disabled || props.room.board.bank[token] <= 0}
-            onClick={() => props.onTokenSelect(token)}
-          >
-            <span>{tokenLabel(token, props.locale)}</span>
-            <strong>{props.room.board.bank[token]}</strong>
-          </button>
-        ))}
-        <div className={`token-button token-static ${tokenClassName('prism')}`}>
+        {(['fire', 'water', 'grass', 'electric', 'psychic'] satisfies TokenKind[]).map((token) => {
+          const selectedCount = selectionCounts[token];
+          return (
+            <button
+              type="button"
+              className={`token-button ${tokenClassName(token)}${selectedCount > 0 ? ' selected' : ''}`}
+              key={token}
+              disabled={props.disabled || props.room.board.bank[token] <= 0}
+              onClick={() => props.onTokenSelect(token)}
+              data-selected-count={selectedCount > 0 ? String(selectedCount) : ''}
+              aria-pressed={selectedCount > 0}
+              title={selectedCount > 0 ? `${tokenLabel(token, props.locale)} (${props.copy.clickToDeselect})` : tokenLabel(token, props.locale)}
+            >
+              <span>{tokenLabel(token, props.locale)}</span>
+              <strong>{props.room.board.bank[token]}</strong>
+            </button>
+          );
+        })}
+        <div className={`token-button token-static ${tokenClassName('prism')}`} title={props.copy.prismHint}>
           <span>{tokenLabel('prism', props.locale)}</span>
           <strong>{props.room.board.bank.prism}</strong>
         </div>
@@ -605,7 +637,7 @@ function BankPanel(props: {
       <div className="bank-actions">
         <button type="button" onClick={props.onClearTokens} disabled={props.disabled || props.tokenSelection.length === 0}>{props.copy.clear}</button>
         <button type="button" className="primary-button" onClick={props.onTakeTokens} disabled={takeDisabled}>
-          <Gem size={18} /> {props.copy.takeEnergy}
+          {props.busy ? <span className="spinner" /> : <Gem size={18} />} {props.copy.takeEnergy}
         </button>
       </div>
     </section>
@@ -753,10 +785,16 @@ function CompanionCardView(props: {
   const flavor = cardFlavor(props.card, props.locale, props.themeId);
   const cardFaceClass = art?.mode === 'card-face' ? 'card-face-card' : '';
   const cardArtClass = art?.mode === 'card-face' ? 'card-face-art' : '';
+  const affordabilityClass = props.disabled ? '' : props.affordable ? 'affordable' : 'unaffordable';
+  const elementColor = elementColorFor(props.card.element);
   return (
-    <article className={`companion-card ${tokenClassName(props.card.element)} ${props.compact === true ? 'compact-card' : ''} ${cardFaceClass}`}>
+    <article
+      className={`companion-card ${tokenClassName(props.card.element)} ${props.compact === true ? 'compact-card' : ''} ${cardFaceClass} ${affordabilityClass}`}
+      aria-label={`${text.name}, ${props.card.points} ${props.copy.glory}, ${tokenLabel(props.card.element, props.locale)} type`}
+    >
       <div className={`card-art ${cardArtClass}`}>
         {art === null ? <span>{text.species.slice(0, 1)}</span> : <img src={art.src} alt={art.alt} loading="lazy" />}
+        <span className="card-element-indicator" style={{ background: elementColor }} title={`${tokenLabel(props.card.element, props.locale)} ${props.copy.type}`} />
       </div>
       <div className="card-body">
         <div className="card-title">
@@ -775,29 +813,40 @@ function CompanionCardView(props: {
   );
 }
 
-function PlayerPanel(props: { copy: AppCopy; locale: Locale; player: PlayerState; active: boolean; controlled: boolean; local: boolean }) {
+function PlayerPanel(props: { copy: AppCopy; locale: Locale; player: PlayerState; active: boolean; controlled: boolean; local: boolean; targetScore?: number }) {
   const badge = props.controlled ? props.copy.controlled : props.local ? props.copy.localSeat : null;
+  const target = props.targetScore ?? 15;
+  const progress = Math.min(100, Math.round((props.player.score / target) * 100));
   return (
     <article className={`player-panel ${props.active ? 'active' : ''} ${props.controlled ? 'controlled' : ''} ${props.local ? 'local' : ''}`}>
       <div className="player-heading">
         <strong>{props.player.name}{badge === null ? '' : ` · ${badge}`}</strong>
         <span>{props.player.score} {props.copy.glory}</span>
       </div>
+      <div className="score-progress">
+        <div className="score-progress-bar" aria-hidden="true">
+          <div className="score-progress-fill" style={{ width: `${progress}%` }} />
+        </div>
+        <span className="score-progress-label">{props.copy.progressToVictory(props.player.score, target)}</span>
+      </div>
       <div className="bonus-row">
         {ELEMENTS.map((element) => (
-          <span className={`mini-token ${tokenClassName(element)}`} title={tokenLabel(element, props.locale)} key={element}>{props.player.bonuses[element]}</span>
+          <span className={`mini-token ${tokenClassName(element)}`} title={`${tokenLabel(element, props.locale)} ${props.copy.bonus}`} key={element}>{props.player.bonuses[element]}</span>
         ))}
-        <span className={`mini-token ${tokenClassName('prism')}`} title={tokenLabel('prism', props.locale)}>{props.player.tokens.prism}</span>
+        <span className={`mini-token ${tokenClassName('prism')}`} title={`${tokenLabel('prism', props.locale)}`}>{props.player.tokens.prism}</span>
       </div>
-      <div className="token-row">
+      <div className="player-token-chips">
         {ELEMENTS.map((element) => (
-          <span key={element}>{tokenLabel(element, props.locale)}: {props.player.tokens[element]}</span>
+          <span className={`player-token-chip ${tokenClassName(element)}`} key={element} title={`${tokenLabel(element, props.locale)}: ${props.player.tokens[element]}`}>
+            <span className="chip-dot" style={{ background: elementColorFor(element), color: '#fff' }}>{props.player.tokens[element] > 0 ? '' : ''}</span>
+            <strong>{props.player.tokens[element]}</strong>
+          </span>
         ))}
       </div>
       <div className="token-row">
         <span>{props.copy.evolutions}: {props.player.evolutionRecords.length}</span>
         <span>{props.copy.pokemonInPlay}: {props.player.tableau.length}</span>
-        {props.player.reserved.length > 0 ? <span className="reserved-count">🎴 {props.player.reserved.length}</span> : null}
+        {props.player.reserved.length > 0 ? <span className="reserved-count">{props.copy.reservedLabel}: {props.player.reserved.length}</span> : null}
       </div>
     </article>
   );
@@ -817,6 +866,18 @@ function CostList(props: { cost: ElementCost }) {
 
 function StatusPill(props: { label: string; tone: 'good' | 'warn' | 'muted' }) {
   return <span className={`status-pill ${props.tone}`}>{props.label}</span>;
+}
+
+function elementColorFor(element: TokenKind): string {
+  switch (element) {
+    case 'fire': return '#c6423e';
+    case 'water': return '#2473aa';
+    case 'grass': return '#4a9e5c';
+    case 'electric': return '#d7aa24';
+    case 'psychic': return '#dc8fb5';
+    case 'prism': return '#7b58c8';
+    default: return '#888';
+  }
 }
 
 function describeActionDisabledReason(copy: AppCopy, room: GameState, isMyTurn: boolean, busy: boolean): string | null {
@@ -930,11 +991,18 @@ function describeTokenTakeServerProblem(copy: AppCopy, locale: Locale, error: Ga
 }
 
 function nextTokenSelection(current: TokenKind[], token: TokenKind): TokenKind[] {
-  const next = [...current, token];
-  if (next.length > 3) {
+  // If the token is already in the selection, remove one instance (deselect).
+  const existingIndex = current.indexOf(token);
+  if (existingIndex !== -1) {
+    const next = [...current];
+    next.splice(existingIndex, 1);
+    return next;
+  }
+  // Otherwise add it, capped at 3.
+  if (current.length >= 3) {
     return [token];
   }
-  return next;
+  return [...current, token];
 }
 
 function nextDiscardSelection(current: TokenKind[], token: TokenKind): TokenKind[] {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, gameApi } from '../api/client';
 import type { ActionOptions, CardSource, GameState, RoomSummary, TokenKind } from '../api/types';
 
@@ -127,28 +127,62 @@ export function useGameRoom() {
     void restoreRoom();
   }, [refreshRooms, restoreRoom]);
 
+  const reconnectRef = useRef<{ attempts: number; timer: ReturnType<typeof setTimeout> | null; manualClose: boolean }>({ attempts: 0, timer: null, manualClose: false });
+  const socketRef = useRef<WebSocket | null>(null);
+
   useEffect(() => {
     if (room === null) {
       setConnected(false);
       return;
     }
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const socket = new WebSocket(`${protocol}//${window.location.host}/ws/rooms/${room.roomId}`);
-    socket.addEventListener('open', () => setConnected(true));
-    socket.addEventListener('close', () => setConnected(false));
-    socket.addEventListener('message', (event) => {
-      const message = JSON.parse(String(event.data)) as WsMessage;
-      if (message.type === 'room_state' && message.room !== undefined) {
-        setRoom(message.room);
-      }
-      if (message.type === 'error') {
-        const nextError = { message: message.error ?? 'WebSocket error' };
-        setLastError(nextError);
-        setError(errorMessage(nextError));
-      }
-    });
+
+    reconnectRef.current.manualClose = false;
+
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const socket = new WebSocket(`${protocol}//${window.location.host}/ws/rooms/${room.roomId}`);
+      socketRef.current = socket;
+
+      socket.addEventListener('open', () => {
+        setConnected(true);
+        reconnectRef.current.attempts = 0;
+      });
+
+      socket.addEventListener('close', () => {
+        setConnected(false);
+        if (reconnectRef.current.manualClose) {
+          return;
+        }
+        const delay = Math.min(Math.pow(2, reconnectRef.current.attempts) * 1000, 30000);
+        reconnectRef.current.attempts += 1;
+        reconnectRef.current.timer = setTimeout(connect, delay);
+      });
+
+      socket.addEventListener('message', (event) => {
+        const message = JSON.parse(String(event.data)) as WsMessage;
+        if (message.type === 'room_state' && message.room !== undefined) {
+          setRoom(message.room);
+        }
+        if (message.type === 'error') {
+          const nextError = { message: message.error ?? 'WebSocket error' };
+          setLastError(nextError);
+          setError(errorMessage(nextError));
+        }
+      });
+    };
+
+    connect();
+
     return () => {
-      socket.close();
+      reconnectRef.current.manualClose = true;
+      if (reconnectRef.current.timer !== null) {
+        clearTimeout(reconnectRef.current.timer);
+        reconnectRef.current.timer = null;
+      }
+      if (socketRef.current !== null) {
+        socketRef.current.close();
+        socketRef.current = null;
+      }
     };
   }, [room?.roomId]);
 

@@ -655,8 +655,8 @@ label {
 }
 
 .token-grass {
-  background: #303237;
-  color: #f1f3f5;
+  background: #4a9e5c;
+  color: #e8f5ec;
 }
 
 .token-electric {
@@ -1509,5 +1509,404 @@ label {
 
   .help-steps li {
     padding-left: 42px;
+  }
+}
+
+/* ============================================================
+   UX Improvements: hover, focus, active, selected states
+   ============================================================ */
+
+/* --- Focus-visible ring for keyboard accessibility --- */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Button hover and active states --- */
+button:not(:disabled):hover {
+  background: #353c46;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+button:not(:disabled):active {
+  background: #2a3038;
+  transform: translateY(1px);
+}
+
+.primary-button:not(:disabled):hover {
+  background: color-mix(in srgb, var(--accent) 88%, white);
+  border-color: var(--accent-border);
+}
+
+.primary-button:not(:disabled):active {
+  background: color-mix(in srgb, var(--accent) 78%, black);
+}
+
+.ghost-button:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.icon-button:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* --- Token button hover and selected states --- */
+.token-button:not(:disabled):hover {
+  filter: brightness(1.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.token-button:not(:disabled):active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.token-button.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 50%, transparent);
+  position: relative;
+}
+
+.token-button.selected::after {
+  content: attr(data-selected-count);
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 12px;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+  border: 2px solid #1e2330;
+  padding: 0 4px;
+}
+
+/* --- Prism token static visual difference --- */
+.token-static {
+  opacity: 0.6;
+  position: relative;
+}
+
+.token-static::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(0, 0, 0, 0.12) 4px,
+    rgba(0, 0, 0, 0.12) 8px
+  );
+  pointer-events: none;
+}
+
+/* --- Deck slot hover --- */
+.deck-slot:not(:disabled):hover {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+    #1f262e;
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* --- Card hover and affordability --- */
+.companion-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.companion-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.companion-card.affordable {
+  border-color: rgba(74, 158, 92, 0.55);
+  box-shadow: 0 0 12px rgba(74, 158, 92, 0.2);
+}
+
+.companion-card.affordable:hover {
+  border-color: rgba(74, 158, 92, 0.8);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 20px rgba(74, 158, 92, 0.3);
+}
+
+.companion-card.unaffordable {
+  opacity: 0.72;
+}
+
+.companion-card.unaffordable:hover {
+  opacity: 0.85;
+}
+
+/* --- Card element type indicator --- */
+.card-element-indicator {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+}
+
+.companion-card {
+  position: relative;
+}
+
+/* --- Special card rarity treatment --- */
+.special-card-slot .companion-card {
+  border-color: rgba(255, 215, 100, 0.35);
+  background: linear-gradient(160deg, #2a2f38 0%, #1e2330 100%);
+}
+
+.special-card-slot .companion-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    rgba(255, 215, 100, 0.06) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* --- Active player pulse animation --- */
+@keyframes active-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--active-border) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--active-border) 0%, transparent);
+  }
+}
+
+.player-panel.active {
+  animation: active-pulse 2.4s ease-in-out infinite;
+}
+
+/* --- Turn panel highlight --- */
+.turn-panel {
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.turn-panel.is-my-turn {
+  border-color: var(--active-border);
+  background: color-mix(in srgb, var(--accent) 8%, rgba(30, 35, 42, 0.92));
+}
+
+/* --- Player token chips (replacing plain text) --- */
+.player-token-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.player-token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 36px;
+  height: 26px;
+  padding: 0 8px 0 4px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.player-token-chip .chip-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+/* --- Score progress bar --- */
+.score-progress {
+  display: grid;
+  gap: 4px;
+}
+
+.score-progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.score-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #fff));
+  transition: width 0.4s ease;
+}
+
+.score-progress-label {
+  font-size: 11px;
+  color: #aeb7c4;
+  font-weight: 700;
+}
+
+/* --- Loading spinner --- */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: currentColor;
+  border-radius: 999px;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+.primary-button .spinner {
+  border-color: rgba(0, 0, 0, 0.2);
+  border-top-color: var(--accent-contrast);
+}
+
+/* --- Dismissible error banner --- */
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  top: 12px;
+  z-index: 100;
+}
+
+.error-banner button {
+  min-height: 28px;
+  width: 28px;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.error-banner button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* --- Reconnection banner --- */
+.reconnect-banner {
+  margin-top: 12px;
+  border: 1px solid rgba(255, 193, 7, 0.4);
+  background: rgba(90, 65, 10, 0.7);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffe8a8;
+}
+
+.reconnect-banner .spinner {
+  border-color: rgba(255, 232, 168, 0.3);
+  border-top-color: #ffe8a8;
+  flex-shrink: 0;
+}
+
+/* --- Action problem area: collapse when empty instead of visibility hidden --- */
+.action-problem.is-empty {
+  display: none;
+}
+
+/* --- Log entry type indicators --- */
+.log-entry {
+  position: relative;
+  padding-left: 12px;
+}
+
+.log-entry::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* --- Room row hover --- */
+.room-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* --- Player panel hover --- */
+.player-panel {
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.player-panel:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* --- Mentor hover --- */
+.mentor {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mentor:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* --- Cost chip affordability indicator --- */
+.cost-chip.insufficient {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+/* --- Reduced motion support --- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .companion-card:hover {
+    transform: none;
+  }
+
+  .token-button:not(:disabled):hover {
+    transform: none;
+  }
+
+  .deck-slot:not(:disabled):hover {
+    transform: none;
+  }
+
+  .player-panel.active {
+    animation: none;
   }
 }

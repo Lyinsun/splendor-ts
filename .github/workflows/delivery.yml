@@ -1,0 +1,67 @@
+name: Delivery Workflow
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      run_regression:
+        description: Run server and business regression smoke checks
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  quality:
+    name: Development and release quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck, test, and build
+        run: npm run workflow:release
+
+      - name: Upload Dashboard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-dist
+          path: dist/dashboard
+          if-no-files-found: error
+
+  regression:
+    name: Regression smoke
+    runs-on: ubuntu-latest
+    needs: quality
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_regression == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run regression workflow
+        run: npm run workflow:regression

@@ -6,4 +6,4 @@ logs/
 .env.*
 !/.env.example
 frontend/dashboard/public/assets/splendor-monsters/
-workflows/
+/workflows/

@@ -10,8 +10,9 @@
 4. [游戏引擎与房间同步](./模块设计/01-游戏引擎与房间同步.md)
 5. [V1 实现设计](./V1实现设计/)
 6. [主题设计：灵兽学院](./主题设计/01-灵兽学院主题设计.md)
-7. [规则调研与主题边界](./research.md)
-8. 当前代码骨架：`src/main.ts`、`src/game/`、`src/gateway/`、`frontend/dashboard/`
+7. [交付工作流](./交付工作流.md)
+8. [规则调研与主题边界](./research.md)
+9. 当前代码骨架：`src/main.ts`、`src/game/`、`src/gateway/`、`frontend/dashboard/`
 
 ## 维护规则
 

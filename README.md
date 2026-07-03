@@ -48,7 +48,10 @@ npm run dev:dashboard
 npm run build:dashboard
 npm run typecheck
 npm test
+npm run workflow:all
 ```
+
+交付流程见 [docs/交付工作流.md](./docs/交付工作流.md)。
 
 ## MVP 范围
 

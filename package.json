@@ -14,7 +14,12 @@
     "typecheck": "npm run typecheck:server && npm run typecheck:dashboard",
     "typecheck:server": "tsc --noEmit",
     "typecheck:dashboard": "tsc --noEmit -p frontend/dashboard/tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "workflow:dev": "npm run typecheck",
+    "workflow:test": "npm run typecheck && npm test",
+    "workflow:release": "npm run typecheck && npm test && npm run build:dashboard",
+    "workflow:regression": "npm run build:dashboard && node --import tsx scripts/regression-smoke.mjs",
+    "workflow:all": "npm run workflow:release && node --import tsx scripts/regression-smoke.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.1",

@@ -772,8 +772,6 @@ label {
 }
 
 .standard-field {
-  --bank-panel-height: 360px;
-  --settlement-panel-height: 200px;
   --market-tier-height: 430px;
   --market-card-height: 382px;
   --market-card-art-height: 146px;
@@ -836,7 +834,7 @@ label {
 }
 
 .field-side-stack .log-panel {
-  max-height: 320px;
+  max-height: 360px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -869,17 +867,14 @@ label {
 }
 
 .field-control-stack {
-  grid-template-rows: var(--bank-panel-height) var(--settlement-panel-height);
-  align-items: start;
+  grid-template-rows: auto auto;
 }
 
 .field-control-stack .bank-panel {
-  height: var(--bank-panel-height);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 54px 128px 44px 1fr;
+  grid-template-rows: 54px 128px 44px auto;
   align-items: stretch;
-  overflow: hidden;
 }
 
 .field-control-stack .bank-panel > div:first-child {
@@ -929,9 +924,7 @@ label {
 }
 
 .field-control-stack .settlement-panel {
-  height: var(--settlement-panel-height);
-  grid-template-rows: 42px minmax(0, 1fr);
-  overflow: hidden;
+  grid-template-rows: 42px auto;
 }
 
 .field-control-stack .settlement-panel .tier-heading {
@@ -941,14 +934,13 @@ label {
 }
 
 .field-control-stack .settlement-grid {
-  min-height: 0;
   grid-template-columns: 1fr;
-  grid-template-rows: 64px 56px;
+  grid-template-rows: auto auto;
+  gap: 8px;
 }
 
 .field-control-stack .settlement-block {
   min-height: 0;
-  overflow: hidden;
 }
 
 .field-control-stack .settlement-block select {

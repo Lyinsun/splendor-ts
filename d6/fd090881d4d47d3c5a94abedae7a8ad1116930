@@ -1,0 +1,25 @@
+README.md
+  s_4363e5846b8931::t_f60e15d0eb50d4 3-5,55-56,59
+frontend/dashboard/src/App.tsx
+  s_4363e5846b8931::t_390cf91bff1b47 38,95-96,104,114,122,387,824,859-872,877-927,1106,1111,1114,1117,1123-1137,1148-1151,1174,1203-1242,1244-1295
+frontend/dashboard/src/styles/dashboard.css
+  s_4363e5846b8931::t_3ae7771089a272 440-555
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "d6fd090881d4d47d3c5a94abedae7a8ad1116930",
+  "prompts": {},
+  "sessions": {
+    "s_4363e5846b8931": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f271e-b575-7e20-9e50-300386b35dd7",
+        "model": "unknown"
+      },
+      "human_author": "jiangyongtao.von <jiangyongtao.von@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}

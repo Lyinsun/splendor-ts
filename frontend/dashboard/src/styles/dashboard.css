@@ -772,8 +772,8 @@ label {
 }
 
 .standard-field {
-  --bank-panel-height: 410px;
-  --settlement-panel-height: 254px;
+  --bank-panel-height: 360px;
+  --settlement-panel-height: 200px;
   --market-tier-height: 430px;
   --market-card-height: 382px;
   --market-card-art-height: 146px;
@@ -877,7 +877,7 @@ label {
   height: var(--bank-panel-height);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 54px 190px 44px 78px;
+  grid-template-rows: 54px 128px 44px 1fr;
   align-items: stretch;
   overflow: hidden;
 }
@@ -911,8 +911,8 @@ label {
 
 .field-control-stack .bank-tokens {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(3, 58px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 58px);
   align-content: start;
 }
 
@@ -943,7 +943,7 @@ label {
 .field-control-stack .settlement-grid {
   min-height: 0;
   grid-template-columns: 1fr;
-  grid-template-rows: 104px 84px;
+  grid-template-rows: 64px 56px;
 }
 
 .field-control-stack .settlement-block {

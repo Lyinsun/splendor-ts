@@ -1,0 +1,23 @@
+frontend/dashboard/src/App.tsx
+  s_5e0146ef34f221::t_e80102bd41b72b 632-636,1071-1087,1089-1090
+frontend/dashboard/src/presentation/themes.ts
+  s_5e0146ef34f221::t_a7370cd960f09a 261-262,458-459
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "d343bdc9afd43ab3ef009d35326cbf633663e298",
+  "prompts": {},
+  "sessions": {
+    "s_5e0146ef34f221": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44571ac7-ef18-4a82-8c58-44ff9069baff",
+        "model": "unknown"
+      },
+      "human_author": "jiangyongtao.von <jiangyongtao.von@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}

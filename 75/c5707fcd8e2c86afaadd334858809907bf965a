@@ -1,0 +1,33 @@
+.github/workflows/delivery.yml
+  s_4363e5846b8931::t_9f0eb1882a57d7 1-67
+.gitignore
+  s_4363e5846b8931::t_1b3c1acecc083e 9
+README.md
+  s_4363e5846b8931::t_88b7fadaaafbb7 51,54-55
+docs/README.md
+  s_4363e5846b8931::t_4ef14a9ee3adb9 13-15
+docs/交付工作流.md
+  s_4363e5846b8931::t_64e9e9fbade863 1-74
+package.json
+  s_4363e5846b8931::t_e3320bbee3dcb5 17-22
+scripts/regression-smoke.mjs
+  s_4363e5846b8931::t_3d82c64d3e4210 1-198
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "75c5707fcd8e2c86afaadd334858809907bf965a",
+  "prompts": {},
+  "sessions": {
+    "s_4363e5846b8931": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f271e-b575-7e20-9e50-300386b35dd7",
+        "model": "unknown"
+      },
+      "human_author": "jiangyongtao.von <jiangyongtao.von@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}

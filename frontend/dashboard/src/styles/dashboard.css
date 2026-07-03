@@ -437,6 +437,122 @@ label {
   font-size: 12px;
 }
 
+.public-card-strip {
+  display: grid;
+  gap: 6px;
+}
+
+.public-card-strip-label {
+  color: rgba(245, 247, 251, 0.72);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.public-card-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.public-card-chip {
+  position: relative;
+  width: 42px;
+  min-width: 42px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 5px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 7px;
+  cursor: default;
+  overflow: visible;
+}
+
+.public-card-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.public-card-chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.public-card-chip > strong {
+  font-size: 12px;
+}
+
+.public-card-popover {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  width: 236px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.public-card-chip:hover .public-card-popover,
+.public-card-chip:focus-visible .public-card-popover {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.public-card-preview {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: #171c22;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+}
+
+.public-card-preview-art {
+  height: 138px;
+  display: grid;
+  place-items: center;
+  background: #10151b;
+}
+
+.public-card-preview-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.public-card-preview-art span {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.public-card-preview-body {
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.public-card-preview-body small,
+.public-card-type {
+  color: #aeb7c4;
+  font-size: 12px;
+}
+
 .mini-token,
 .cost-chip {
   min-width: 24px;

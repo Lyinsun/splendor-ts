@@ -35,6 +35,7 @@ const EVOLUTION_TIERS = [2, 3] satisfies CardTier[];
 
 type AppCopy = (typeof APP_COPY)[Locale];
 type ActionContext = 'take_tokens' | null;
+type GameActionKind = 'take_tokens' | 'reserve_card' | 'buy_card';
 interface EvolutionCandidate {
   selection: EvolutionSelection;
   label: string;
@@ -91,7 +92,8 @@ export function App() {
     }
   };
 
-  const actionOptions = (): ActionOptions => buildActionOptions(room, myPlayer, discardSelection, evolutionSelection);
+  const actionOptions = (actionKind: GameActionKind, source?: Exclude<CardSource, { kind: 'deck' }>): ActionOptions =>
+    buildActionOptions(actionKind, room, myPlayer, discardSelection, evolutionSelection, source);
   const clearSettlementDraft = () => {
     setDiscardSelection([]);
     setEvolutionSelection(null);
@@ -99,7 +101,7 @@ export function App() {
 
   const handleTakeTokens = async () => {
     setLastActionContext('take_tokens');
-    const next = await game.takeTokens(tokenSelection, actionOptions());
+    const next = await game.takeTokens(tokenSelection, actionOptions('take_tokens'));
     if (next !== null) {
       setTokenSelection([]);
       clearSettlementDraft();
@@ -109,7 +111,7 @@ export function App() {
 
   const handleReserve = async (source: Extract<CardSource, { kind: 'market' | 'deck' }>) => {
     setLastActionContext(null);
-    const next = await game.reserveCard(source, actionOptions());
+    const next = await game.reserveCard(source, actionOptions('reserve_card'));
     if (next !== null) {
       clearSettlementDraft();
     }
@@ -117,7 +119,7 @@ export function App() {
 
   const handleBuy = async (source: Exclude<CardSource, { kind: 'deck' }>) => {
     setLastActionContext(null);
-    const next = await game.buyCard(source, actionOptions());
+    const next = await game.buyCard(source, actionOptions('buy_card', source));
     if (next !== null) {
       clearSettlementDraft();
     }
@@ -382,6 +384,7 @@ function GameTable(props: {
               key={player.id}
               copy={props.copy}
               locale={props.locale}
+              themeId={props.themeId}
               player={player}
               active={props.room.currentPlayerId === player.id}
               controlled={props.playerId === player.id}
@@ -818,7 +821,7 @@ function CompanionCardView(props: {
   );
 }
 
-function PlayerPanel(props: { copy: AppCopy; locale: Locale; player: PlayerState; active: boolean; controlled: boolean; local: boolean; targetScore?: number }) {
+function PlayerPanel(props: { copy: AppCopy; locale: Locale; themeId: ThemeId; player: PlayerState; active: boolean; controlled: boolean; local: boolean; targetScore?: number }) {
   const badge = props.controlled ? props.copy.controlled : props.local ? props.copy.localSeat : null;
   const target = props.targetScore ?? 18;
   const progress = Math.min(100, Math.round((props.player.score / target) * 100));
@@ -853,7 +856,72 @@ function PlayerPanel(props: { copy: AppCopy; locale: Locale; player: PlayerState
         <span>{props.copy.pokemonInPlay}: {props.player.tableau.length}</span>
         {props.player.reserved.length > 0 ? <span className="reserved-count">{props.copy.reservedLabel}: {props.player.reserved.length}</span> : null}
       </div>
+      <PlayerCardStrip
+        copy={props.copy}
+        locale={props.locale}
+        themeId={props.themeId}
+        label={props.copy.pokemonInPlay}
+        cards={props.player.tableau}
+      />
+      <PlayerCardStrip
+        copy={props.copy}
+        locale={props.locale}
+        themeId={props.themeId}
+        label={props.copy.reservedLabel}
+        cards={props.player.reserved}
+      />
     </article>
+  );
+}
+
+function PlayerCardStrip(props: { copy: AppCopy; locale: Locale; themeId: ThemeId; label: string; cards: CompanionCard[] }) {
+  if (props.cards.length === 0) {
+    return null;
+  }
+  return (
+    <div className="public-card-strip">
+      <span className="public-card-strip-label">{props.label}</span>
+      <div className="public-card-list">
+        {props.cards.map((card) => (
+          <PublicCardChip
+            key={card.id}
+            copy={props.copy}
+            locale={props.locale}
+            themeId={props.themeId}
+            card={card}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PublicCardChip(props: { copy: AppCopy; locale: Locale; themeId: ThemeId; card: CompanionCard }) {
+  const text = cardText(props.card, props.locale, props.themeId);
+  const art = cardArt(props.card, props.locale, props.themeId);
+  const elementLabel = tokenLabel(props.card.element, props.locale);
+  const title = `${text.name} · ${props.card.points} ${props.copy.glory} · ${elementLabel}`;
+  return (
+    <div className={`public-card-chip ${tokenClassName(props.card.element)}`} tabIndex={0} role="group" aria-label={title}>
+      <span>{text.name.slice(0, 2)}</span>
+      <strong>{props.card.points}</strong>
+      <div className="public-card-popover" role="tooltip">
+        <div className="public-card-preview">
+          <div className="public-card-preview-art">
+            {art === null ? <span>{text.name.slice(0, 1)}</span> : <img src={art.src} alt={art.alt} loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+          </div>
+          <div className="public-card-preview-body">
+            <div className="card-title">
+              <strong>{text.name}</strong>
+              <span>{props.card.points} {props.copy.glory}</span>
+            </div>
+            <small>{text.species}</small>
+            <span className="public-card-type">{elementLabel} {props.copy.type}</span>
+            <CostList cost={props.card.cost} />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1035,19 +1103,36 @@ function isElementToken(token: TokenKind): boolean {
 }
 
 function buildActionOptions(
+  actionKind: GameActionKind,
   room: GameState | null,
   player: PlayerState | undefined,
   discardSelection: TokenKind[],
   evolutionSelection: EvolutionSelection | null,
+  source?: Exclude<CardSource, { kind: 'deck' }>,
 ): ActionOptions {
   const options: ActionOptions = {};
-  if (discardSelection.length > 0) {
+  if (shouldSendDiscardSelection(actionKind, room, player, discardSelection)) {
     options.discardTokens = [...discardSelection];
   }
-  if (room !== null && player !== undefined && evolutionSelection !== null && isValidEvolutionSelection(player, room, evolutionSelection)) {
+  if (room !== null && player !== undefined && evolutionSelection !== null && isValidEvolutionSelectionForAction(actionKind, player, room, evolutionSelection, source)) {
     options.evolution = evolutionSelection;
   }
   return options;
+}
+
+function shouldSendDiscardSelection(actionKind: GameActionKind, room: GameState | null, player: PlayerState | undefined, discardSelection: TokenKind[]): boolean {
+  if (discardSelection.length === 0 || room === null || player === undefined) {
+    return false;
+  }
+  if (actionKind === 'buy_card') {
+    return false;
+  }
+  if (actionKind === 'reserve_card') {
+    const prismGain = room.board.bank.prism > 0 ? 1 : 0;
+    const requiredDiscards = Math.max(tokenTotal(player.tokens) + prismGain - 10, 0);
+    return requiredDiscards > 0 && discardSelection.length === requiredDiscards;
+  }
+  return true;
 }
 
 function canAfford(player: PlayerState, card: CompanionCard): boolean {
@@ -1058,6 +1143,10 @@ function canAfford(player: PlayerState, card: CompanionCard): boolean {
     prismNeeded += missing;
   }
   return prismNeeded <= player.tokens.prism;
+}
+
+function bonusValue(card: CompanionCard): number {
+  return card.bonusValue ?? (card.specialRank === undefined ? 1 : 2);
 }
 
 function evolutionCandidates(player: PlayerState, room: GameState, locale: Locale): EvolutionCandidate[] {
@@ -1082,7 +1171,7 @@ function evolutionCandidates(player: PlayerState, room: GameState, locale: Local
   const candidates: EvolutionCandidate[] = [];
   for (const from of player.tableau) {
     for (const target of targetCards) {
-      if (!isEvolutionChain(from, target.card)) {
+      if (!isEvolutionChain(from, target.card) || !canMeetEvolutionRequirementThisTurn(player, room, from, target.card)) {
         continue;
       }
       const fromText = cardText(from, locale);
@@ -1111,8 +1200,99 @@ function isEvolutionChain(from: CompanionCard, to: CompanionCard): boolean {
   return to.evolvesFrom === from.id || to.evolvesFrom === fromPokemonId;
 }
 
+function meetsEvolutionRequirement(player: PlayerState, from: CompanionCard, to: CompanionCard): boolean {
+  if (from.evolvesTo !== undefined) {
+    return hasElementRequirement(player, from.evolvesTo.requirement);
+  }
+  return hasElementRequirement(player, to.evolutionRequirement ?? {});
+}
+
+function hasElementRequirement(player: PlayerState, requirement: ElementCost): boolean {
+  return ELEMENTS.every((element) => player.bonuses[element] >= (requirement[element] ?? 0));
+}
+
+function canMeetEvolutionRequirementThisTurn(player: PlayerState, room: GameState, from: CompanionCard, to: CompanionCard): boolean {
+  if (meetsEvolutionRequirement(player, from, to)) {
+    return true;
+  }
+  return purchasableCards(room, player)
+    .filter((card) => card.id !== to.id)
+    .some((card) => meetsEvolutionRequirement(withPurchasedBonus(player, card), from, to));
+}
+
+function isValidEvolutionSelectionForAction(
+  actionKind: GameActionKind,
+  player: PlayerState,
+  room: GameState,
+  selection: EvolutionSelection,
+  source?: Exclude<CardSource, { kind: 'deck' }>,
+): boolean {
+  if (actionKind !== 'buy_card') {
+    return isValidEvolutionSelection(player, room, selection);
+  }
+  if (source === undefined || isSameEvolutionTarget(selection, source)) {
+    return false;
+  }
+  const boughtCard = findCardBySource(room, player, source);
+  if (boughtCard === undefined || !canAfford(player, boughtCard)) {
+    return false;
+  }
+  return isValidEvolutionSelection(withPurchasedBonus(player, boughtCard), room, selection);
+}
+
 function isValidEvolutionSelection(player: PlayerState, room: GameState, selection: EvolutionSelection): boolean {
-  return evolutionCandidates(player, room, 'en-US').some((candidate) => evolutionValue(candidate.selection) === evolutionValue(selection));
+  const from = player.tableau.find((card) => card.id === selection.fromCardId);
+  const to = findEvolutionTarget(room, player, selection);
+  return from !== undefined && to !== undefined && isEvolutionChain(from, to) && meetsEvolutionRequirement(player, from, to);
+}
+
+function withPurchasedBonus(player: PlayerState, card: CompanionCard): PlayerState {
+  return {
+    ...player,
+    bonuses: {
+      ...player.bonuses,
+      [card.element]: player.bonuses[card.element] + bonusValue(card),
+    },
+  };
+}
+
+function purchasableCards(room: GameState, player: PlayerState): CompanionCard[] {
+  const cards: CompanionCard[] = [];
+  for (const tier of [1, 2, 3] satisfies CardTier[]) {
+    cards.push(...room.board.market[tier]);
+  }
+  cards.push(...player.reserved);
+  for (const rank of ['rare', 'legendary'] satisfies SpecialCardRank[]) {
+    cards.push(...room.board.specialMarket[rank]);
+  }
+  return cards.filter((card) => canAfford(player, card));
+}
+
+function findCardBySource(room: GameState, player: PlayerState, source: Exclude<CardSource, { kind: 'deck' }>): CompanionCard | undefined {
+  if (source.kind === 'reserved') {
+    return player.reserved.find((card) => card.id === source.cardId);
+  }
+  if (source.kind === 'special_market') {
+    return room.board.specialMarket[source.rank].find((card) => card.id === source.cardId);
+  }
+  return room.board.market[source.tier].find((card) => card.id === source.cardId);
+}
+
+function findEvolutionTarget(room: GameState, player: PlayerState, selection: EvolutionSelection): CompanionCard | undefined {
+  if (selection.to.kind === 'reserved') {
+    return player.reserved.find((card) => card.id === selection.to.cardId);
+  }
+  return room.board.market[selection.to.tier].find((card) => card.id === selection.to.cardId);
+}
+
+function isSameEvolutionTarget(selection: EvolutionSelection, source: Exclude<CardSource, { kind: 'deck' }>): boolean {
+  if (source.kind === 'reserved') {
+    return selection.to.kind === 'reserved' && selection.to.cardId === source.cardId;
+  }
+  if (source.kind === 'market') {
+    return selection.to.kind === 'market' && selection.to.tier === source.tier && selection.to.cardId === source.cardId;
+  }
+  return false;
 }
 
 function evolutionValue(selection: EvolutionSelection): string {

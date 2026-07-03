@@ -629,7 +629,11 @@ function BankPanel(props: {
               onClick={() => props.onTokenSelect(token)}
               data-selected-count={selectedCount > 0 ? String(selectedCount) : ''}
               aria-pressed={selectedCount > 0}
-              title={selectedCount > 0 ? `${tokenLabel(token, props.locale)} (${props.copy.clickToDeselect})` : tokenLabel(token, props.locale)}
+              title={selectedCount === 2
+                ? `${tokenLabel(token, props.locale)} (${props.copy.clickToClear})`
+                : selectedCount === 1
+                  ? `${tokenLabel(token, props.locale)} (${props.copy.clickAgainForTwo})`
+                  : tokenLabel(token, props.locale)}
             >
               <span>{tokenLabel(token, props.locale)}</span>
               <strong>{props.room.board.bank[token]}</strong>
@@ -1064,14 +1068,26 @@ function describeTokenTakeServerProblem(copy: AppCopy, locale: Locale, error: Ga
 }
 
 function nextTokenSelection(current: TokenKind[], token: TokenKind): TokenKind[] {
-  // If the token is already in the selection, remove one instance (deselect).
-  const existingIndex = current.indexOf(token);
-  if (existingIndex !== -1) {
-    const next = [...current];
-    next.splice(existingIndex, 1);
-    return next;
+  const selectionCounts = countTokens(current);
+  const currentCount = selectionCounts[token] ?? 0;
+
+  // Cycle: 0 → 1 → 2 → 0 (per token kind)
+
+  // Already at 2: remove all instances of this token (cycle back to 0).
+  if (currentCount >= 2) {
+    return current.filter((existing) => existing !== token);
   }
-  // Otherwise add it, capped at 3.
+
+  // At 1: add a second one (for "take two matching" rule).
+  if (currentCount === 1) {
+    if (current.length >= 3) {
+      // Already at 3 total, switch to pair mode with just this token.
+      return [token, token];
+    }
+    return [...current, token];
+  }
+
+  // At 0: add one. If total is already at 3, start fresh.
   if (current.length >= 3) {
     return [token];
   }

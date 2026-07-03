@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COMPANION_CARDS } from '../src/game/domain/content.js';
+import { COMPANION_CARDS, GYM_LEADERS } from '../src/game/domain/content.js';
 import { addPlayerToLobby, applyGameAction, createLobbyState, startGame } from '../src/game/domain/engine.js';
 import { listLegalGameActions } from '../src/game/domain/legal-actions.js';
 import { GameRuleError, type CompanionCard, type Element } from '../src/game/domain/types.js';
@@ -317,7 +317,7 @@ describe('game engine', () => {
     second.evolutionRecords = [];
     second.score = 18;
     game.currentPlayerId = 'p2';
-    game.finalRoundStartedBy = 'p1';
+    game.endGameTriggeredBy = 'p1';
 
     const next = applyGameAction(game, { kind: 'take_tokens', playerId: 'p2', tokens: ['fire', 'water', 'grass'] });
 
@@ -365,6 +365,173 @@ describe('game engine', () => {
   it('rejects actions from a player who does not own the current turn', () => {
     const game = startedGame();
     expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p2', tokens: ['fire', 'water', 'grass'] })).toThrow(GameRuleError);
+  });
+
+  it('auto-awards a gym leader when element bonuses meet the requirement', () => {
+    const game = startedGame();
+    const player = game.players[0];
+    expect(player).toBeDefined();
+    if (player === undefined) {
+      throw new Error('missing test fixture');
+    }
+    // Set up player with 4 fire bonus to qualify for Flare Warden
+    player.bonuses = { ...createElementCounter(), fire: 4 };
+    player.tableau = [
+      testCard('fire-mon-1', 1, 'FireMon1', 'fire', 1, {}),
+      testCard('fire-mon-2', 1, 'FireMon2', 'fire', 1, {}),
+      testCard('fire-mon-3', 1, 'FireMon3', 'fire', 1, {}),
+      testCard('fire-mon-4', 1, 'FireMon4', 'fire', 1, {}),
+    ];
+    // Put Flare Warden in the available leaders
+    const flareWarden = GYM_LEADERS.find((leader) => leader.id === 'leader-flare');
+    expect(flareWarden).toBeDefined();
+    if (flareWarden === undefined) {
+      throw new Error('missing gym leader fixture');
+    }
+    game.board.gymLeaders = [flareWarden];
+
+    // Take tokens (any action triggers the check)
+    const next = applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'water', 'grass'] });
+    const updatedPlayer = next.players.find((entry) => entry.id === 'p1');
+
+    expect(updatedPlayer?.gymLeaders).toHaveLength(1);
+    expect(updatedPlayer?.gymLeaders[0]?.id).toBe('leader-flare');
+    expect(updatedPlayer?.score).toBe(4 + 3); // 4 from cards + 3 from gym leader
+    expect(next.board.gymLeaders).toHaveLength(0); // leader removed from board
+  });
+
+  it('applies element bonuses to reduce card cost when buying', () => {
+    const game = startedGame();
+    const player = game.players[0];
+    const card = game.board.market[1][0];
+    expect(player).toBeDefined();
+    expect(card).toBeDefined();
+    if (player === undefined || card === undefined) {
+      throw new Error('missing test fixture');
+    }
+    // Give player 2 bonus of the card's element
+    const bonusElement = card.element;
+    player.bonuses = { ...createElementCounter(), [bonusElement]: 2 };
+    // Give player enough tokens to cover cost minus 2 bonus
+    const costAfterBonus = { ...card.cost };
+    costAfterBonus[bonusElement] = Math.max((costAfterBonus[bonusElement] ?? 0) - 2, 0);
+    player.tokens = { ...emptyTokenBank(), ...costAfterBonus };
+
+    const next = applyGameAction(game, { kind: 'buy_card', playerId: 'p1', source: { kind: 'market', tier: 1, cardId: card.id } });
+    const updatedPlayer = next.players.find((entry) => entry.id === 'p1');
+
+    expect(updatedPlayer?.tableau.map((entry) => entry.id)).toContain(card.id);
+    // Verify tokens were correctly deducted (bonus applied)
+    for (const element of ['fire', 'water', 'grass', 'electric', 'psychic'] as const) {
+      const expected = (player.tokens[element] ?? 0) - (costAfterBonus[element] ?? 0);
+      expect(updatedPlayer?.tokens[element]).toBe(Math.max(0, expected));
+    }
+  });
+
+  it('uses prism tokens as wildcards to cover cost shortfalls', () => {
+    const game = startedGame();
+    const player = game.players[0];
+    expect(player).toBeDefined();
+    if (player === undefined) {
+      throw new Error('missing test fixture');
+    }
+    // Create a card that costs 3 fire
+    const card = testCard('prism-test', 1, 'PrismTest', 'fire', 2, { fire: 3 });
+    game.board.market[1][0] = card;
+    // Player has only 1 fire but 2 prisms
+    player.tokens = { ...emptyTokenBank(), fire: 1, prism: 2 };
+
+    const next = applyGameAction(game, { kind: 'buy_card', playerId: 'p1', source: { kind: 'market', tier: 1, cardId: card.id } });
+    const updatedPlayer = next.players.find((entry) => entry.id === 'p1');
+
+    expect(updatedPlayer?.tableau.map((entry) => entry.id)).toContain(card.id);
+    expect(updatedPlayer?.tokens.fire).toBe(0);
+    expect(updatedPlayer?.tokens.prism).toBe(0); // 2 prisms used as wildcards
+    expect(next.board.bank.fire).toBe(5); // bank gets 1 fire back
+    expect(next.board.bank.prism).toBe(7); // bank gets 2 prisms back (5 initial + 2)
+  });
+
+  it('scales the token bank for 3-player and 4-player games', () => {
+    const lobby3 = createLobbyState('room_3p', '3P Room', { id: 'p1', name: 'A' });
+    let joined3 = addPlayerToLobby(lobby3, { id: 'p2', name: 'B' });
+    joined3 = addPlayerToLobby(joined3, { id: 'p3', name: 'C' });
+    const game3 = startGame(joined3, 'p1');
+    expect(game3.board.bank.fire).toBe(5);
+
+    const lobby4 = createLobbyState('room_4p', '4P Room', { id: 'p1', name: 'A' });
+    let joined4 = addPlayerToLobby(lobby4, { id: 'p2', name: 'B' });
+    joined4 = addPlayerToLobby(joined4, { id: 'p3', name: 'C' });
+    joined4 = addPlayerToLobby(joined4, { id: 'p4', name: 'D' });
+    const game4 = startGame(joined4, 'p1');
+    expect(game4.board.bank.fire).toBe(7);
+    expect(game4.board.gymLeaders).toHaveLength(5); // min(4+1, 6) = 5
+  });
+
+  it('rejects reserving a fourth card when three are already reserved', () => {
+    const game = startedGame();
+    const player = game.players[0];
+    expect(player).toBeDefined();
+    if (player === undefined) {
+      throw new Error('missing test fixture');
+    }
+    player.reserved = [
+      testCard('r1', 1, 'R1', 'fire', 0, {}),
+      testCard('r2', 1, 'R2', 'water', 0, {}),
+      testCard('r3', 1, 'R3', 'grass', 0, {}),
+    ];
+
+    expect(() => applyGameAction(game, {
+      kind: 'reserve_card',
+      playerId: 'p1',
+      source: { kind: 'deck', tier: 1 },
+    })).toThrow(GameRuleError);
+  });
+
+  it('rejects non-host players from starting the game', () => {
+    const lobby = createLobbyState('room_host', 'Host Room', { id: 'host', name: 'Host' });
+    const joined = addPlayerToLobby(lobby, { id: 'guest', name: 'Guest' });
+    expect(() => startGame(joined, 'guest')).toThrow(GameRuleError);
+  });
+
+  it('requires at least four tokens in the bank to take a matching pair', () => {
+    const game = startedGame();
+    game.board.bank = { fire: 3, water: 4, grass: 7, electric: 7, psychic: 7, prism: 5 };
+
+    expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'fire'] })).toThrow(GameRuleError);
+
+    const next = applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['water', 'water'] });
+    const player = next.players.find((entry) => entry.id === 'p1');
+    expect(player?.tokens.water).toBe(2);
+    expect(next.board.bank.water).toBe(2);
+  });
+
+  it('finishes the game with a single winner when one player clearly leads', () => {
+    const game = startedGame();
+    const first = game.players[0];
+    const second = game.players[1];
+    expect(first).toBeDefined();
+    expect(second).toBeDefined();
+    if (first === undefined || second === undefined) {
+      throw new Error('missing test fixture');
+    }
+    first.tableau = [testCard('p1-18', 1, 'P1 Winner', 'fire', 18, {})];
+    first.score = 18;
+    second.tableau = [testCard('p2-10', 1, 'P2 Loser', 'water', 10, {})];
+    second.score = 10;
+    game.currentPlayerId = 'p1';
+
+    const next = applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'water', 'grass'] });
+
+    // p1 triggered end-game, but game doesn't end until round finishes (next player would be order 0)
+    // Since p1 is order 0 and just played, next is p2 (order 1). Game continues.
+    expect(next.status).toBe('playing');
+    expect(next.endGameTriggeredBy).toBe('p1');
+    expect(next.currentPlayerId).toBe('p2');
+
+    // p2 takes their final turn
+    const finished = applyGameAction(next, { kind: 'take_tokens', playerId: 'p2', tokens: ['fire', 'water', 'grass'] });
+    expect(finished.status).toBe('finished');
+    expect(finished.winnerIds).toEqual(['p1']);
   });
 });
 

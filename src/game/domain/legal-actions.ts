@@ -203,21 +203,14 @@ function evolutionCandidates(state: GameState, playerId: string): EvolutionSelec
   if (player === undefined) {
     return [];
   }
-  const sourceCards = [
-    ...player.tableau,
-    ...player.reserved,
-    ...CARD_TIERS.flatMap((tier) => state.board.market[tier]),
-  ];
+  // Evolution sources must be cards you own and have in play (tableau only).
+  const sourceCards = player.tableau;
   const sourceIds = new Set(sourceCards.map((card) => card.id));
   const sourcePokemonIds = new Set(sourceCards.map((card) => pokemonIdForEvolution(card)));
   const targets: EvolutionTargetCandidate[] = [];
   for (const tier of CARD_TIERS) {
     for (const card of state.board.market[tier]) {
       targets.push({ card, source: { kind: 'market', tier, cardId: card.id } });
-    }
-    const refillCard = state.board.decks[tier][0];
-    if (refillCard !== undefined) {
-      targets.push({ card: refillCard, source: { kind: 'market', tier, cardId: refillCard.id } });
     }
   }
   for (const card of player.reserved) {

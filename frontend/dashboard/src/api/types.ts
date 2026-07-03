@@ -83,7 +83,7 @@ export interface GameState {
   turn: number;
   round: number;
   targetScore: number;
-  finalRoundStartedBy: string | null;
+  endGameTriggeredBy: string | null;
   winnerIds: string[];
   logs: GameLogEntry[];
   createdAt: string;

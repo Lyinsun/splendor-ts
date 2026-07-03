@@ -149,7 +149,7 @@ export function App() {
         <div className="hero-meta">
           <StatusPill label={theme.label[locale]} tone="muted" />
           <StatusPill label={room === null ? copy.noRoomStatus : copy.roomStatus[room.status]} tone={room?.status === 'playing' ? 'good' : 'muted'} />
-          {room?.finalRoundStartedBy !== null && room?.finalRoundStartedBy !== undefined ? <StatusPill label={copy.finalRound} tone="warn" /> : null}
+          {room?.endGameTriggeredBy !== null && room?.endGameTriggeredBy !== undefined ? <StatusPill label={copy.finalRound} tone="warn" /> : null}
         </div>
       </section>
 

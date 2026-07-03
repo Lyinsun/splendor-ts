@@ -46,7 +46,7 @@ export function createLobbyState(roomId: string, roomName: string, host: LobbyPl
     turn: 0,
     round: 1,
     targetScore: TARGET_SCORE,
-    finalRoundStartedBy: null,
+    endGameTriggeredBy: null,
     winnerIds: [],
     logs: [
       {
@@ -91,7 +91,7 @@ export function startGame(state: GameState, playerId: string, now = new Date().t
   next.currentPlayerId = next.players[0]?.id ?? null;
   next.turn = 1;
   next.round = 1;
-  next.finalRoundStartedBy = null;
+  next.endGameTriggeredBy = null;
   next.winnerIds = [];
   appendLog(next, 'The first trainer round has started.', now);
   next.updatedAt = now;
@@ -114,7 +114,6 @@ export function applyGameAction(state: GameState, action: GameAction, now = new 
   discardDownToLimit(next, player, action.discardTokens ?? [], now);
   evolveCardIfSelected(next, player, action.evolution ?? null, now);
   awardGymLeaderIfEligible(next, player, now);
-  recalculatePlayer(player);
   handleEndOfTurn(next, player, now);
   next.updatedAt = now;
   return next;
@@ -443,7 +442,6 @@ function evolveCardIfSelected(state: GameState, player: PlayerState, selection: 
   if (selection === null) {
     return;
   }
-  recalculatePlayer(player);
   const fromIndex = player.tableau.findIndex((card) => card.id === selection.fromCardId);
   if (fromIndex < 0) {
     throw new GameRuleError('Evolution source card is not in play.', 'evolution_source_not_found');
@@ -509,9 +507,9 @@ function locateEvolutionTarget(
 
 function handleEndOfTurn(state: GameState, player: PlayerState, now: string): void {
   recalculatePlayer(player);
-  if (player.score >= state.targetScore && state.finalRoundStartedBy === null) {
-    state.finalRoundStartedBy = player.id;
-    appendLog(state, `${player.name} reached ${state.targetScore} glory. Final round begins.`, now);
+  if (player.score >= state.targetScore && state.endGameTriggeredBy === null) {
+    state.endGameTriggeredBy = player.id;
+    appendLog(state, `${player.name} reached ${state.targetScore} glory. The current round will finish.`, now);
   }
 
   const nextPlayer = nextTurnPlayer(state, player);
@@ -520,7 +518,7 @@ function handleEndOfTurn(state: GameState, player: PlayerState, now: string): vo
     state.round += 1;
   }
 
-  if (state.finalRoundStartedBy !== null && nextPlayer.order === 0) {
+  if (state.endGameTriggeredBy !== null && nextPlayer.order === 0) {
     finishGame(state, now);
     return;
   }

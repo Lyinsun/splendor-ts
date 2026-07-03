@@ -286,7 +286,7 @@ export const APP_COPY = {
         },
         {
           title: '第 3 步：进行回合',
-          body: '轮到你时，可以从精灵球供应区拿球、保留卡牌或捕获卡牌。目标是通过捕获宝可梦和获得训练师徽章来积累分数，率先达到 18 分触发终局轮！',
+          body: '轮到你时，可以从精灵球供应区拿球、保留卡牌或捕获卡牌。目标是通过捕获宝可梦和获得训练师徽章来积累分数，率先达到 18 分触发游戏结束！',
         },
       ],
       tip: '提示：拿球时可以选择 3 种不同精灵球，或 2 枚相同精灵球（银行需剩余 ≥ 4 枚）。',
@@ -335,8 +335,8 @@ export const APP_COPY = {
         {
           title: '终局与胜负',
           items: [
-            { name: '终局轮触发', desc: '任意玩家分数达到 18 分时，当前回合结束后进入终局轮。所有玩家再进行最后一个回合。' },
-            { name: '胜负判定', desc: '终局轮结束后分数最高者获胜。平局时依次比较：进化记录数 → 在场宝可梦数量。' },
+            { name: '终局触发', desc: '任意玩家分数达到 18 分时，本轮结束后游戏终止。本轮中尚未行动的玩家可以再行动一次。' },
+            { name: '胜负判定', desc: '游戏结束后分数最高者获胜。平局时依次比较：进化记录数 → 在场宝可梦数量。' },
           ],
         },
       ],
@@ -362,7 +362,7 @@ export const APP_COPY = {
         { q: '属性加成有什么用？', a: '每捕获一张宝可梦卡，你会获得对应属性的永久加成。购买卡牌时，加成可以抵扣对应属性的费用。' },
         { q: '保留卡牌有上限吗？', a: '最多保留 3 张卡牌。保留区的卡牌可以随时购买。' },
         { q: '怎么和朋友一起玩？', a: '创建房间后，让朋友在同一网络下访问同一个地址（默认端口 19988），在房间列表中加入即可。' },
-        { q: '终局轮是什么？', a: '当任意玩家达到 18 分时触发。当前回合结束后，所有玩家再进行最后一个回合，然后结算胜负。' },
+        { q: '终局轮是什么？', a: '当任意玩家达到 18 分时触发。本轮结束后游戏终止，本轮中尚未行动的玩家可以再行动一次，然后结算胜负。' },
       ],
     },
   },
@@ -473,7 +473,7 @@ export const APP_COPY = {
         },
         {
           title: 'Step 3: Take your turn',
-          body: 'On your turn, take balls from the supply, reserve a card, or capture a card. The goal is to reach 18 points by capturing Pokemon and earning trainer badges to trigger the final round!',
+          body: 'On your turn, take balls from the supply, reserve a card, or capture a card. The goal is to reach 18 points by capturing Pokemon and earning trainer badges to trigger the end game!',
         },
       ],
       tip: 'Tip: When taking balls, choose 3 different kinds or 2 of the same kind (requires ≥ 4 of that ball in the bank).',
@@ -522,7 +522,7 @@ export const APP_COPY = {
         {
           title: 'End Game & Winning',
           items: [
-            { name: 'Final Round Trigger', desc: 'When any player reaches 18 points, the current round ends and the final round begins. All players get one last turn.' },
+            { name: 'End Game Trigger', desc: 'When any player reaches 18 points, the current round finishes. Players who haven\'t played yet this round get one more turn before the game ends.' },
             { name: 'Tiebreakers', desc: 'Highest score wins. Ties broken by: most evolution records → most Pokemon in play.' },
           ],
         },
@@ -549,7 +549,7 @@ export const APP_COPY = {
         { q: 'What do element bonuses do?', a: 'Each captured Pokemon gives a permanent element bonus. When buying cards, bonuses reduce the cost of matching elements.' },
         { q: 'Is there a limit on reserved cards?', a: 'You can reserve up to 3 cards. Reserved cards can be purchased at any time on your turn.' },
         { q: 'How do I play with friends?', a: 'Create a room and have your friend visit the same address (default port 19988) on the same network. They can join from the room list.' },
-        { q: 'What is the final round?', a: 'Triggered when any player reaches 18 points. After the current turn ends, all players get one last turn before scoring determines the winner.' },
+        { q: 'What is the final round?', a: 'Triggered when any player reaches 18 points. The current round finishes — players who haven\'t played yet this round get one more turn before the game ends and scores are tallied.' },
       ],
     },
   },
@@ -792,9 +792,9 @@ export function formatLogMessage(entry: GameLogEntry, locale: Locale): string {
     return `${evolved[1]} 将 ${evolved[2]} 进化为 ${evolved[3]}。`;
   }
 
-  const finalRound = /^(.*) reached (\d+) glory\. Final round begins\.$/.exec(entry.message);
+  const finalRound = /^(.*) reached (\d+) glory\. The current round will finish\.$/.exec(entry.message);
   if (finalRound?.[1] !== undefined && finalRound[2] !== undefined) {
-    return `${finalRound[1]} 达到 ${finalRound[2]} 分，终局轮开始。`;
+    return `${finalRound[1]} 达到 ${finalRound[2]} 分，本轮结束后游戏终止。`;
   }
 
   const finished = /^Game finished\. Winner: (.*)\.$/.exec(entry.message);

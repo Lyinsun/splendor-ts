@@ -919,10 +919,89 @@ label {
 
 .reserved-row {
   margin-top: 0;
+  overflow: hidden;
 }
 
-.reserved-row h3 {
-  margin-bottom: 8px;
+.reserved-row-header {
+  width: 100%;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.reserved-row-header:not(:disabled):hover {
+  background: transparent;
+}
+
+.reserved-row-header:not(:disabled):active {
+  transform: none;
+}
+
+.reserved-row-header > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.reserved-row-header h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reserved-row-count {
+  min-width: 28px;
+  height: 22px;
+  padding: 0 8px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.reserved-toggle-icon {
+  width: 36px;
+  height: 36px;
+  padding: 9px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+  transition: transform 160ms ease;
+}
+
+.reserved-row.is-open .reserved-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.reserved-body {
+  max-height: 520px;
+  overflow: auto;
+  padding-top: 8px;
+  opacity: 1;
+  visibility: visible;
+  transition: max-height 180ms ease, opacity 140ms ease, padding-top 180ms ease, visibility 0s;
+}
+
+.reserved-row.is-collapsed .reserved-body {
+  max-height: 0;
+  overflow: hidden;
+  padding-top: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: max-height 180ms ease, opacity 120ms ease, padding-top 180ms ease, visibility 0s 180ms;
 }
 
 .reserved-groups {

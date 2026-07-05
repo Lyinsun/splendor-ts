@@ -1,4 +1,4 @@
-import { CircleHelp, Copy, Gem, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users, X } from 'lucide-react';
+import { ChevronDown, CircleHelp, Copy, Gem, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users, X } from 'lucide-react';
 import { type CSSProperties, useEffect, useState } from 'react';
 import type { ActionOptions, CardSource, CardTier, CompanionCard, ElementCost, EvolutionSelection, GameState, PlayerState, SpecialCardRank, TokenKind } from './api/types';
 import { ELEMENTS } from './api/types';
@@ -361,6 +361,9 @@ function GameTable(props: {
   const actionDisabledReason = describeActionDisabledReason(props.copy, props.room, props.isMyTurn, props.busy);
   const localPlayers = props.room.players.filter((p) => props.localPlayerIds.includes(p.id));
   const hasAnyReserved = localPlayers.some((p) => p.reserved.length > 0);
+  const reservedCount = localPlayers.reduce((sum, player) => sum + player.reserved.length, 0);
+  const [reservedOpen, setReservedOpen] = useState(false);
+  const reservedPanelId = 'local-reserved-cards';
   return (
     <section className="table-layout standard-table">
       <aside className="panel side-panel player-rail">
@@ -417,32 +420,48 @@ function GameTable(props: {
         </div>
 
         {hasBoard && localPlayers.length > 0 ? (
-          <div className="reserved-row panel">
-            <h3>{props.copy.yourReserve}</h3>
-            {!hasAnyReserved ? <p className="empty">{props.copy.noReserved}</p> : null}
-            <div className="reserved-groups">
-              {localPlayers.map((lp) => (
-                lp.reserved.length > 0 ? (
-                  <div className="reserved-group" key={lp.id}>
-                    <span className="reserved-group-label">{lp.name}</span>
-                    <div className="reserved-cards">
-                      {lp.reserved.map((card) => (
-                        <CompanionCardView
-                          key={card.id}
-                          copy={props.copy}
-                          locale={props.locale}
-                          themeId={props.themeId}
-                          card={card}
-                          compact
-                          disabled={lp.id !== props.playerId || !props.isMyTurn || props.busy}
-                          affordable={canAfford(lp, card)}
-                          onBuy={() => props.onBuy({ kind: 'reserved', cardId: card.id })}
-                        />
-                      ))}
+          <div className={`reserved-row panel ${reservedOpen ? 'is-open' : 'is-collapsed'}`}>
+            <button
+              type="button"
+              className="reserved-row-header"
+              aria-controls={reservedPanelId}
+              aria-expanded={reservedOpen}
+              aria-label={reservedOpen ? props.copy.collapseReserve : props.copy.expandReserve}
+              title={reservedOpen ? props.copy.collapseReserve : props.copy.expandReserve}
+              onClick={() => setReservedOpen((open) => !open)}
+            >
+              <div>
+                <h3>{props.copy.yourReserve}</h3>
+                <span className="reserved-row-count">{reservedCount}</span>
+              </div>
+              <ChevronDown className="reserved-toggle-icon" size={18} />
+            </button>
+            <div className="reserved-body" id={reservedPanelId} aria-hidden={!reservedOpen}>
+              {!hasAnyReserved ? <p className="empty">{props.copy.noReserved}</p> : null}
+              <div className="reserved-groups">
+                {localPlayers.map((lp) => (
+                  lp.reserved.length > 0 ? (
+                    <div className="reserved-group" key={lp.id}>
+                      <span className="reserved-group-label">{lp.name}</span>
+                      <div className="reserved-cards">
+                        {lp.reserved.map((card) => (
+                          <CompanionCardView
+                            key={card.id}
+                            copy={props.copy}
+                            locale={props.locale}
+                            themeId={props.themeId}
+                            card={card}
+                            compact
+                            disabled={lp.id !== props.playerId || !props.isMyTurn || props.busy || !reservedOpen}
+                            affordable={canAfford(lp, card)}
+                            onBuy={() => props.onBuy({ kind: 'reserved', cardId: card.id })}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ) : null
-              ))}
+                  ) : null
+                ))}
+              </div>
             </div>
           </div>
         ) : null}

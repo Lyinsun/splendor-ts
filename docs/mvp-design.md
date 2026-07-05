@@ -46,6 +46,7 @@
 - HTTP action 成功后返回权威 `GameState`。
 - WebSocket `/ws/rooms/:roomId` 广播 `room_state`。
 - 客户端断线后可重新 `GET /v1/rooms/:roomId` 恢复。
+- 公网临时部署可设置 `SPLENDOR_PUBLIC_BASE_PATH=/play-8f3k2q9m`，此时 Dashboard、HTTP API、WebSocket 与展示资源都会挂在该前缀下，例如 `/play-8f3k2q9m/v1/rooms` 与 `/play-8f3k2q9m/ws/rooms/:roomId`。该前缀只用于隐藏入口，不替代认证或访问控制。
 
 ## 展示主题与语言
 

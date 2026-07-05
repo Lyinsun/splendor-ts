@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest';
+import { normalizePublicBasePath } from '../src/config/config.js';
 import { COMPANION_CARDS, GYM_LEADERS } from '../src/game/domain/content.js';
 import { addPlayerToLobby, applyGameAction, createLobbyState, startGame } from '../src/game/domain/engine.js';
 import { listLegalGameActions } from '../src/game/domain/legal-actions.js';
 import { GameRuleError, type CompanionCard, type Element } from '../src/game/domain/types.js';
 import { createElementCounter, emptyTokenBank } from '../src/game/domain/tokens.js';
+
+describe('config', () => {
+  it('normalizes the public base path for prefixed deployments', () => {
+    expect(normalizePublicBasePath(undefined)).toBe('');
+    expect(normalizePublicBasePath('')).toBe('');
+    expect(normalizePublicBasePath('/')).toBe('');
+    expect(normalizePublicBasePath('play-8f3k2q')).toBe('/play-8f3k2q');
+    expect(normalizePublicBasePath('/play-8f3k2q/')).toBe('/play-8f3k2q');
+  });
+});
 
 describe('game engine', () => {
   it('starts a two-player game with a filled market and player-scaled bank', () => {

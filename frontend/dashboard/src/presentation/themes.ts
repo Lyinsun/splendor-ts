@@ -1,4 +1,5 @@
 import type { CardTier, CompanionCard, GameLogEntry, GameState, GymLeader, TokenKind } from '../api/types';
+import { publicUrl } from '../runtime/publicPath';
 import { creatureAcademyLore } from './creatureAcademy';
 
 export const LOCALES = ['zh-CN', 'en-US'] as const;
@@ -738,7 +739,7 @@ export function cardArt(card: CompanionCard, locale: Locale, themeId: ThemeId): 
   const text = cardText(card, locale, themeId);
   const filename = art.strategy === 'card-id' ? `${card.id}.png` : `${card.element}-t${card.tier}.png`;
   return {
-    src: `${art.basePath}/${filename}`,
+    src: publicUrl(`${art.basePath}/${filename}`),
     alt: locale === 'zh-CN' ? `${text.name} 卡牌插画` : `${text.name} card art`,
     mode: art.mode ?? 'illustration',
   };

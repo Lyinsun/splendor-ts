@@ -10,12 +10,12 @@ const projectRoot = path.resolve(__dirname, '../../..');
 const dashboardDist = path.join(projectRoot, 'dist/dashboard');
 const projectAssetsRoot = path.join(projectRoot, 'assets/splendor-monsters');
 
-export async function dashboardIndexHtml(): Promise<string> {
+export async function dashboardIndexHtml(publicBasePath = ''): Promise<string> {
   const indexPath = path.join(dashboardDist, 'index.html');
   try {
-    return await readFile(indexPath, 'utf8');
+    return prepareIndexHtml(await readFile(indexPath, 'utf8'), publicBasePath);
   } catch {
-    return `<!doctype html>
+    return prepareIndexHtml(`<!doctype html>
 <html lang="en">
   <head><meta charset="UTF-8"><title>Splendor Monsters TS</title></head>
   <body>
@@ -24,8 +24,22 @@ export async function dashboardIndexHtml(): Promise<string> {
       <p>Run <code>npm run build:dashboard</code>, then restart the server.</p>
     </main>
   </body>
-</html>`;
+</html>`, publicBasePath);
   }
+}
+
+export function createDashboardAssetHandler(publicBasePath = ''): MiddlewareHandler {
+  return async (c) => {
+    const relativePath = routeRelativePath(c, joinRoute(publicBasePath, '/dashboard-assets/'));
+    return serveFile(c, dashboardDist, relativePath);
+  };
+}
+
+export function createSplendorAssetHandler(publicBasePath = ''): MiddlewareHandler {
+  return async (c) => {
+    const relativePath = routeRelativePath(c, joinRoute(publicBasePath, '/assets/splendor-monsters/'));
+    return serveFile(c, projectAssetsRoot, relativePath);
+  };
 }
 
 export const serveDashboardAsset: MiddlewareHandler = async (c) => {
@@ -37,6 +51,20 @@ export const serveSplendorAsset: MiddlewareHandler = async (c) => {
   const relativePath = routeRelativePath(c, '/assets/splendor-monsters/');
   return serveFile(c, projectAssetsRoot, relativePath);
 };
+
+function prepareIndexHtml(html: string, publicBasePath: string): string {
+  const normalizedBase = publicBasePath === '/' ? '' : publicBasePath;
+  const runtimeConfig = `<script>window.__SPLENDOR_PUBLIC_BASE_PATH__=${JSON.stringify(normalizedBase)};</script>`;
+  const withRuntimeConfig = html.includes('</head>')
+    ? html.replace('</head>', `    ${runtimeConfig}\n  </head>`)
+    : `${runtimeConfig}\n${html}`;
+  if (normalizedBase === '') {
+    return withRuntimeConfig;
+  }
+  return withRuntimeConfig
+    .replaceAll('"/dashboard-assets/', `"${normalizedBase}/dashboard-assets/`)
+    .replaceAll("'/dashboard-assets/", `'${normalizedBase}/dashboard-assets/`);
+}
 
 async function serveFile(c: Context, root: string, relativePath: string): Promise<Response> {
   const safePath = safeJoin(root, relativePath);
@@ -62,6 +90,10 @@ function routeRelativePath(c: Context, prefix: string): string {
   const pathname = new URL(c.req.url).pathname;
   const raw = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : '';
   return decodeURIComponent(raw || 'index.html');
+}
+
+function joinRoute(publicBasePath: string, route: string): string {
+  return `${publicBasePath}${route}`;
 }
 
 function safeJoin(root: string, relativePath: string): string | null {

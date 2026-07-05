@@ -13,7 +13,7 @@ import {
 } from '../../game/domain/types.js';
 import type { AppServices } from '../../game/application/composition.js';
 import { RoomNotFoundError, roomErrorStatus } from '../../game/application/room-service.js';
-import { dashboardIndexHtml, serveDashboardAsset, serveSplendorAsset } from './dashboard-static.js';
+import { createDashboardAssetHandler, createSplendorAssetHandler, dashboardIndexHtml } from './dashboard-static.js';
 
 export interface HttpAppDependencies {
   config: AppConfig;
@@ -22,23 +22,29 @@ export interface HttpAppDependencies {
 
 export function createHttpApp(deps: HttpAppDependencies) {
   const app = new Hono();
+  const basePath = deps.config.http.publicBasePath;
+  const route = (path: string) => `${basePath}${path}`;
 
-  app.use('/dashboard-assets/*', serveDashboardAsset);
-  app.use('/assets/splendor-monsters/*', serveSplendorAsset);
+  app.use(route('/dashboard-assets/*'), createDashboardAssetHandler(basePath));
+  app.use(route('/assets/splendor-monsters/*'), createSplendorAssetHandler(basePath));
 
-  app.get('/', async (c) => c.html(await dashboardIndexHtml()));
+  app.get(route('/'), async (c) => c.html(await dashboardIndexHtml(basePath)));
+  if (basePath !== '') {
+    app.get(basePath, async (c) => c.html(await dashboardIndexHtml(basePath)));
+  }
 
-  app.get('/healthz', (c) =>
+  app.get(route('/healthz'), (c) =>
     c.json({
       ok: true,
       service: 'splendor-monsters-ts',
       port: deps.config.http.port,
+      publicBasePath: basePath,
     }),
   );
 
-  app.get('/v1/rooms', (c) => c.json(deps.services.rooms.listRooms()));
+  app.get(route('/v1/rooms'), (c) => c.json(deps.services.rooms.listRooms()));
 
-  app.post('/v1/rooms', async (c) => {
+  app.post(route('/v1/rooms'), async (c) => {
     try {
       const body = await readJson(c.req);
       const roomName = optionalStringField(body, 'roomName');
@@ -51,50 +57,53 @@ export function createHttpApp(deps: HttpAppDependencies) {
     }
   });
 
-  app.get('/v1/rooms/:roomId', (c) => {
+  app.get(route('/v1/rooms/:roomId'), (c) => {
     try {
-      return c.json(deps.services.rooms.getRoom(c.req.param('roomId')));
+      return c.json(deps.services.rooms.getRoom(pathParam(c.req.param('roomId'), 'roomId')));
     } catch (error) {
       return errorResponse(c, error);
     }
   });
 
-  app.get('/v1/rooms/:roomId/players/:playerId/legal-actions', (c) => {
+  app.get(route('/v1/rooms/:roomId/players/:playerId/legal-actions'), (c) => {
     try {
-      return c.json(deps.services.rooms.listLegalActions(c.req.param('roomId'), c.req.param('playerId')));
+      return c.json(deps.services.rooms.listLegalActions(
+        pathParam(c.req.param('roomId'), 'roomId'),
+        pathParam(c.req.param('playerId'), 'playerId'),
+      ));
     } catch (error) {
       return errorResponse(c, error);
     }
   });
 
-  app.post('/v1/rooms/:roomId/join', async (c) => {
+  app.post(route('/v1/rooms/:roomId/join'), async (c) => {
     try {
       const body = await readJson(c.req);
-      const result = deps.services.rooms.joinRoom(c.req.param('roomId'), stringField(body, 'playerName', 'Trainer'));
+      const result = deps.services.rooms.joinRoom(pathParam(c.req.param('roomId'), 'roomId'), stringField(body, 'playerName', 'Trainer'));
       return c.json(result);
     } catch (error) {
       return errorResponse(c, error);
     }
   });
 
-  app.post('/v1/rooms/:roomId/demo-player', (c) => {
+  app.post(route('/v1/rooms/:roomId/demo-player'), (c) => {
     try {
-      return c.json(deps.services.rooms.addDemoPlayer(c.req.param('roomId')));
+      return c.json(deps.services.rooms.addDemoPlayer(pathParam(c.req.param('roomId'), 'roomId')));
     } catch (error) {
       return errorResponse(c, error);
     }
   });
 
-  app.post('/v1/rooms/:roomId/start', async (c) => {
+  app.post(route('/v1/rooms/:roomId/start'), async (c) => {
     try {
       const body = await readJson(c.req);
-      return c.json(deps.services.rooms.startRoom(c.req.param('roomId'), stringField(body, 'playerId')));
+      return c.json(deps.services.rooms.startRoom(pathParam(c.req.param('roomId'), 'roomId'), stringField(body, 'playerId')));
     } catch (error) {
       return errorResponse(c, error);
     }
   });
 
-  app.post('/v1/rooms/:roomId/actions/take-tokens', async (c) => {
+  app.post(route('/v1/rooms/:roomId/actions/take-tokens'), async (c) => {
     try {
       const body = await readJson(c.req);
       const action: GameAction = {
@@ -103,13 +112,13 @@ export function createHttpApp(deps: HttpAppDependencies) {
         tokens: tokenArrayField(body, 'tokens'),
         ...actionOptionsField(body),
       };
-      return c.json(deps.services.rooms.applyAction(c.req.param('roomId'), action));
+      return c.json(deps.services.rooms.applyAction(pathParam(c.req.param('roomId'), 'roomId'), action));
     } catch (error) {
       return errorResponse(c, error);
     }
   });
 
-  app.post('/v1/rooms/:roomId/actions/reserve', async (c) => {
+  app.post(route('/v1/rooms/:roomId/actions/reserve'), async (c) => {
     try {
       const body = await readJson(c.req);
       const action: GameAction = {
@@ -118,13 +127,13 @@ export function createHttpApp(deps: HttpAppDependencies) {
         source: reserveCardSourceField(body),
         ...actionOptionsField(body),
       };
-      return c.json(deps.services.rooms.applyAction(c.req.param('roomId'), action));
+      return c.json(deps.services.rooms.applyAction(pathParam(c.req.param('roomId'), 'roomId'), action));
     } catch (error) {
       return errorResponse(c, error);
     }
   });
 
-  app.post('/v1/rooms/:roomId/actions/buy', async (c) => {
+  app.post(route('/v1/rooms/:roomId/actions/buy'), async (c) => {
     try {
       const body = await readJson(c.req);
       const action: GameAction = {
@@ -133,7 +142,7 @@ export function createHttpApp(deps: HttpAppDependencies) {
         source: buyCardSourceField(body),
         ...actionOptionsField(body),
       };
-      return c.json(deps.services.rooms.applyAction(c.req.param('roomId'), action));
+      return c.json(deps.services.rooms.applyAction(pathParam(c.req.param('roomId'), 'roomId'), action));
     } catch (error) {
       return errorResponse(c, error);
     }
@@ -170,6 +179,13 @@ function stringField(body: Record<string, unknown>, field: string, fallback?: st
     return fallback;
   }
   throw new GameRuleError(`Missing string field: ${field}`, 'invalid_request');
+}
+
+function pathParam(value: string | undefined, field: string): string {
+  if (typeof value === 'string' && value.trim() !== '') {
+    return value;
+  }
+  throw new GameRuleError(`Missing path parameter: ${field}`, 'invalid_request');
 }
 
 function optionalStringField(body: Record<string, unknown>, field: string): string | undefined {

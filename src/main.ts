@@ -8,7 +8,7 @@ import { createHttpApp } from './gateway/http/app.js';
 const config = loadConfig();
 const services = composeAppServices();
 const app = createHttpApp({ config, services });
-const wsHub = new RoomWebSocketHub(services.rooms);
+const wsHub = new RoomWebSocketHub(services.rooms, config.http.publicBasePath);
 
 const server = serve(
   {
@@ -18,7 +18,7 @@ const server = serve(
   },
   (info) => {
     console.log(`Splendor Monsters TS listening on http://${info.address}:${info.port}`);
-    console.log(`Dashboard: http://localhost:${info.port}/`);
+    console.log(`Dashboard: http://localhost:${info.port}${config.http.publicBasePath || '/'}`);
   },
 ) as Server;
 

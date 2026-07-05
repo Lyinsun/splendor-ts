@@ -4,6 +4,7 @@ import type { ActionOptions, CardSource, CardTier, CompanionCard, ElementCost, E
 import { ELEMENTS } from './api/types';
 import { useGameRoom, type GameRoomError } from './hooks/useGameRoom';
 import { HelpModal, hasSeenTutorial, type HelpTab } from './HelpModal';
+import { publicUrl } from './runtime/publicPath';
 import {
   APP_COPY,
   LOCALE_OPTIONS,
@@ -66,7 +67,7 @@ export function App() {
 
   const room = game.room;
   const myPlayer = game.currentPlayer;
-  const appStyle = { '--hero-image': `url("${theme.assets.hero.src}")` } as CSSProperties;
+  const appStyle = { '--hero-image': `url("${publicUrl(theme.assets.hero.src)}")` } as CSSProperties;
 
   // Reset dismiss when a new error arrives.
   useEffect(() => {

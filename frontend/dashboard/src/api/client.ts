@@ -1,4 +1,5 @@
 import type { ActionOptions, CardSource, GameState, LegalGameActionList, RoomSummary, TokenKind } from './types';
+import { publicUrl } from '../runtime/publicPath';
 
 export class ApiError extends Error {
   constructor(
@@ -68,7 +69,7 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<T>
     init.body = JSON.stringify(options.body);
   }
   try {
-    const response = await fetch(url, init);
+    const response = await fetch(publicUrl(url), init);
     const payload = await response.json().catch(() => undefined);
     if (!response.ok) {
       const message = payload !== undefined && typeof payload === 'object' && 'error' in payload ? String(payload.error) : response.statusText;

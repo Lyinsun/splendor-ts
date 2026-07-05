@@ -13,13 +13,16 @@ export class RoomWebSocketHub {
   private readonly sockets = new Set<RoomSocket>();
   private readonly wss = new WebSocketServer({ noServer: true });
 
-  constructor(private readonly rooms: RoomService) {
+  constructor(
+    private readonly rooms: RoomService,
+    private readonly publicBasePath = '',
+  ) {
     this.rooms.subscribe((room) => this.broadcastRoom(room));
   }
 
   attach(server: Server): void {
     server.on('upgrade', (request, socket, head) => {
-      const roomId = parseRoomId(request);
+      const roomId = parseRoomId(request, this.publicBasePath);
       if (roomId === null) {
         socket.destroy();
         return;
@@ -59,8 +62,13 @@ export class RoomWebSocketHub {
   }
 }
 
-function parseRoomId(request: IncomingMessage): string | null {
+function parseRoomId(request: IncomingMessage, publicBasePath: string): string | null {
   const url = new URL(request.url ?? '/', 'http://localhost');
-  const match = /^\/ws\/rooms\/([^/]+)$/.exec(url.pathname);
+  const escapedBasePath = escapeRegExp(publicBasePath);
+  const match = new RegExp(`^${escapedBasePath}/ws/rooms/([^/]+)$`).exec(url.pathname);
   return match?.[1] ?? null;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

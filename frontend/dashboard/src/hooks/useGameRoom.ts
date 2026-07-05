@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, gameApi } from '../api/client';
 import type { ActionOptions, CardSource, GameState, RoomSummary, TokenKind } from '../api/types';
+import { publicWsUrl } from '../runtime/publicPath';
 
 const ROOM_KEY = 'splendor-monsters-room-id';
 const PLAYER_KEY = 'splendor-monsters-player-id';
@@ -146,8 +147,7 @@ export function useGameRoom() {
     reconnectRef.current.manualClose = false;
 
     const connect = () => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const socket = new WebSocket(`${protocol}//${window.location.host}/ws/rooms/${room.roomId}`);
+      const socket = new WebSocket(publicWsUrl(`/ws/rooms/${room.roomId}`));
       socketRef.current = socket;
 
       socket.addEventListener('open', () => {

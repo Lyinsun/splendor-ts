@@ -2113,3 +2113,36 @@ button:not(:disabled):active {
     animation: none;
   }
 }
+
+/* Multiplayer: presence, departed seats, face-down reservations */
+.presence-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.presence-dot.online {
+  background: #3fae5c;
+  box-shadow: 0 0 0 2px rgba(63, 174, 92, 0.25);
+}
+
+.presence-dot.offline {
+  background: #9aa0a6;
+}
+
+.player-panel.left {
+  opacity: 0.55;
+}
+
+.kick-button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.hidden-card-chip {
+  background: repeating-linear-gradient(45deg, #3b3f55, #3b3f55 6px, #4a4f6a 6px, #4a4f6a 12px);
+  color: #fff;
+}

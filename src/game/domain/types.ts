@@ -11,6 +11,7 @@ export const SPECIAL_CARD_RANKS = ['rare', 'legendary'] as const;
 export type SpecialCardRank = (typeof SPECIAL_CARD_RANKS)[number];
 
 export type GameStatus = 'lobby' | 'playing' | 'finished';
+export type PlayerSeatStatus = 'active' | 'left';
 
 export type TokenBank = Record<TokenKind, number>;
 export type ElementCost = Partial<Record<Element, number>>;
@@ -49,10 +50,13 @@ export interface PlayerState {
   id: string;
   name: string;
   order: number;
+  status: PlayerSeatStatus;
   tokens: TokenBank;
   bonuses: Record<Element, number>;
   tableau: CompanionCard[];
   reserved: CompanionCard[];
+  /** Ids of reserved cards taken face-down from a deck; hidden from other viewers. */
+  hiddenReservedIds: string[];
   evolutionRecords: EvolutionRecord[];
   gymLeaders: GymLeader[];
   score: number;
@@ -82,6 +86,8 @@ export interface GameLogEntry {
 
 export interface GameState {
   roomId: string;
+  /** Monotonic revision, bumped on every accepted state change. Clients drop older snapshots. */
+  version: number;
   roomName: string;
   status: GameStatus;
   players: PlayerState[];
@@ -153,6 +159,10 @@ export type GameAction =
       source: Exclude<CardSource, { kind: 'deck' }>;
       discardTokens?: TokenKind[];
       evolution?: EvolutionSelection | null;
+    }
+  | {
+      kind: 'pass_turn';
+      playerId: string;
     };
 
 export class GameRuleError extends Error {

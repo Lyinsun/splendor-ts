@@ -1,11 +1,12 @@
-import { RoomService } from './room-service.js';
+import { RoomService, type RoomServiceOptions } from './room-service.js';
 
 export interface AppServices {
   rooms: RoomService;
 }
 
-export function composeAppServices(): AppServices {
+/** Infrastructure (e.g. the SQLite repository) is injected by the entrypoint to keep dependencies pointing inward. */
+export function composeAppServices(options: RoomServiceOptions = {}): AppServices {
   return {
-    rooms: new RoomService(),
+    rooms: new RoomService(options),
   };
 }

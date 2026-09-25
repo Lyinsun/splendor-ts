@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, gameApi } from '../api/client';
-import type { ActionOptions, CardSource, GameState, RoomSummary, TokenKind } from '../api/types';
-import { publicWsUrl } from '../runtime/publicPath';
+import type { ActionOptions, CardSource, GameState, RoomSummary, SeatGrant, TokenKind } from '../api/types';
+import { publicUrl, publicWsUrl } from '../runtime/publicPath';
 
-const ROOM_KEY = 'splendor-monsters-room-id';
-const PLAYER_KEY = 'splendor-monsters-player-id';
-const LOCAL_PLAYERS_KEY = 'splendor-monsters-local-player-ids';
+/** `{ roomId, seats: { playerId: seatToken }, controlledPlayerId }` for the room this device sits at. */
+const SESSION_KEY = 'splendor-monsters-session';
 const NAME_KEY = 'splendor-monsters-player-name';
+/** Pre-token keys; they cannot authenticate anymore and are only cleaned up. */
+const LEGACY_KEYS = ['splendor-monsters-room-id', 'splendor-monsters-player-id', 'splendor-monsters-local-player-ids'];
 
 const safeStorage = {
   get(key: string): string | null { try { return localStorage.getItem(key); } catch { return null; } },
@@ -14,10 +15,21 @@ const safeStorage = {
   remove(key: string): void { try { localStorage.removeItem(key); } catch { /* ignore */ } },
 };
 
+interface SeatSession {
+  roomId: string;
+  seats: Record<string, string>;
+  controlledPlayerId: string;
+}
+
 interface WsMessage {
-  type: 'room_state' | 'error';
+  type: 'room_state' | 'auth_ok' | 'action_result' | 'room_closed' | 'pong' | 'error';
+  requestId?: string;
   room?: GameState;
+  onlinePlayerIds?: string[];
+  playerId?: string;
+  ok?: boolean;
   error?: string;
+  error_code?: string;
 }
 
 export interface GameRoomError {
@@ -27,137 +39,165 @@ export interface GameRoomError {
 }
 
 export function useGameRoom() {
+  const [session, setSessionState] = useState<SeatSession | null>(readSession);
   const [room, setRoom] = useState<GameState | null>(null);
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
-  const [playerId, setPlayerId] = useState<string>(() => safeStorage.get(PLAYER_KEY) ?? '');
-  const [localPlayerIds, setLocalPlayerIds] = useState<string[]>(readLocalPlayerIds);
+  const [onlinePlayerIds, setOnlinePlayerIds] = useState<string[]>([]);
   const [playerName, setPlayerName] = useState<string>(() => safeStorage.get(NAME_KEY) ?? 'Trainer');
   const [error, setError] = useState<string | null>(null);
   const [lastError, setLastError] = useState<GameRoomError | null>(null);
   const [busy, setBusy] = useState(false);
   const [connected, setConnected] = useState(false);
 
+  const playerId = session?.controlledPlayerId ?? '';
+  const seatToken = session?.seats[playerId];
+  const localPlayerIds = useMemo(() => Object.keys(session?.seats ?? {}), [session]);
+
   const currentPlayer = useMemo(() => room?.players.find((player) => player.id === playerId), [playerId, room]);
   const localPlayers = useMemo(() => room?.players.filter((player) => localPlayerIds.includes(player.id)) ?? [], [localPlayerIds, room]);
   const activePlayer = useMemo(() => room?.players.find((player) => player.id === room.currentPlayerId), [room]);
   const isMyTurn = room?.status === 'playing' && room.currentPlayerId === playerId;
-  const isHost = room?.hostPlayerId !== null && room?.hostPlayerId !== undefined && localPlayerIds.includes(room.hostPlayerId);
+  const hostSeatToken = room?.hostPlayerId == null ? undefined : session?.seats[room.hostPlayerId];
+  const isHost = hostSeatToken !== undefined;
 
-  const setControlledPlayerId = useCallback((nextPlayerId: string) => {
-    setPlayerId(nextPlayerId);
-    if (nextPlayerId === '') {
-      safeStorage.remove(PLAYER_KEY);
-    } else {
-      safeStorage.set(PLAYER_KEY, nextPlayerId);
-    }
-  }, []);
-
-  const replaceLocalPlayerIds = useCallback((nextPlayerIds: string[]) => {
-    const normalized = unique(nextPlayerIds);
-    setLocalPlayerIds(normalized);
-    writeLocalPlayerIds(normalized);
-  }, []);
-
-  const rememberLocalPlayerId = useCallback((nextPlayerId: string) => {
-    setLocalPlayerIds((current) => {
-      const next = unique([...current, nextPlayerId]);
-      writeLocalPlayerIds(next);
-      return next;
+  const setSession = useCallback((next: SeatSession | null | ((current: SeatSession | null) => SeatSession | null)) => {
+    setSessionState((current) => {
+      const resolved = typeof next === 'function' ? next(current) : next;
+      writeSession(resolved);
+      return resolved;
     });
   }, []);
 
-  const selectPlayer = useCallback((nextPlayerId: string) => {
-    if (room === null || !localPlayerIds.includes(nextPlayerId) || !room.players.some((player) => player.id === nextPlayerId)) {
+  // Views are personalised: only accept a snapshot rendered for the seat we control, and never go back in time.
+  const expectedViewerRef = useRef<string | null>(null);
+  expectedViewerRef.current = seatToken === undefined ? null : playerId;
+  const acceptRoom = useCallback((next: GameState) => {
+    if (next.viewerPlayerId !== expectedViewerRef.current) {
       return;
     }
-    setControlledPlayerId(nextPlayerId);
-  }, [localPlayerIds, room, setControlledPlayerId]);
+    setRoom((current) => (current !== null && current.roomId === next.roomId && current.viewerPlayerId === next.viewerPlayerId && next.version < current.version ? current : next));
+  }, []);
+
+  const reportError = useCallback((caught: unknown) => {
+    const nextError = normalizeError(caught);
+    setLastError(nextError);
+    setError(errorMessage(nextError));
+  }, []);
+
+  const resetToHall = useCallback((message?: string) => {
+    setSession(null);
+    setRoom(null);
+    setOnlinePlayerIds([]);
+    if (message !== undefined) {
+      setError(message);
+    }
+  }, [setSession]);
 
   const refreshRooms = useCallback(async () => {
     try {
       setRooms(await gameApi.listRooms());
     } catch (caught) {
-      const nextError = normalizeError(caught);
-      setLastError(nextError);
-      setError(errorMessage(nextError));
+      reportError(caught);
     }
-  }, []);
+  }, [reportError]);
 
-  const restoreRoom = useCallback(async () => {
-    const storedRoomId = safeStorage.get(ROOM_KEY);
-    if (storedRoomId === null) {
-      return;
-    }
-    try {
-      const restoredRoom = await gameApi.getRoom(storedRoomId);
-      setRoom(restoredRoom);
-    } catch {
-      safeStorage.remove(ROOM_KEY);
-      safeStorage.remove(PLAYER_KEY);
-      safeStorage.remove(LOCAL_PLAYERS_KEY);
-      setPlayerId('');
-      setLocalPlayerIds([]);
-      setError('你之前的游戏房间已不存在，已返回大厅');
-    }
-  }, []);
+  const adoptGrant = useCallback((grant: SeatGrant, keepExistingSeats: boolean) => {
+    expectedViewerRef.current = grant.playerId;
+    setSession((current) => ({
+      roomId: grant.room.roomId,
+      seats: { ...(keepExistingSeats && current?.roomId === grant.room.roomId ? current.seats : {}), [grant.playerId]: grant.seatToken },
+      controlledPlayerId: grant.playerId,
+    }));
+    setRoom(grant.room);
+  }, [setSession]);
 
-  useEffect(() => {
-    if (room === null) {
-      return;
-    }
-    const roomPlayerIds = room.players.map((player) => player.id);
-    setLocalPlayerIds((current) => {
-      const migrated = playerId !== '' && roomPlayerIds.includes(playerId) ? [...current, playerId] : current;
-      const next = unique(migrated).filter((id) => roomPlayerIds.includes(id));
-      if (sameIds(current, next)) {
-        return current;
-      }
-      writeLocalPlayerIds(next);
-      return next;
-    });
-  }, [playerId, room]);
-
-  useEffect(() => {
-    if (room === null) {
-      return;
-    }
-    const roomPlayerIds = room.players.map((player) => player.id);
-    const localRoomPlayerIds = localPlayerIds.filter((id) => roomPlayerIds.includes(id));
-    const activeLocalPlayerId = room.currentPlayerId !== null && localRoomPlayerIds.includes(room.currentPlayerId) ? room.currentPlayerId : null;
-    const nextPlayerId = activeLocalPlayerId ?? (localRoomPlayerIds.includes(playerId) ? playerId : localRoomPlayerIds[0] ?? '');
-    if (nextPlayerId !== playerId) {
-      setControlledPlayerId(nextPlayerId);
-    }
-  }, [localPlayerIds, playerId, room, setControlledPlayerId]);
-
+  // Restore on load: a `?room=&seat=` link (another device handing over a seat) wins over the stored session.
   useEffect(() => {
     void refreshRooms();
-    void restoreRoom();
-  }, [refreshRooms, restoreRoom]);
+    LEGACY_KEYS.forEach((key) => safeStorage.remove(key));
+    const params = new URLSearchParams(window.location.search);
+    const linkRoomId = params.get('room');
+    const linkSeatToken = params.get('seat');
+    if (linkSeatToken !== null) {
+      params.delete('seat');
+      const query = params.toString();
+      window.history.replaceState(null, '', `${window.location.pathname}${query === '' ? '' : `?${query}`}${window.location.hash}`);
+    }
+    const stored = readSession();
+    const restore = async () => {
+      if (linkRoomId !== null && linkSeatToken !== null) {
+        try {
+          const view = await gameApi.getRoom(linkRoomId, linkSeatToken);
+          if (view.viewerPlayerId !== null) {
+            adoptGrant({ room: view, playerId: view.viewerPlayerId, seatToken: linkSeatToken }, true);
+            return;
+          }
+        } catch {
+          setError('座位链接已失效（房间已关闭或座位已被移除）');
+        }
+      }
+      if (stored === null) {
+        return;
+      }
+      const token = stored.seats[stored.controlledPlayerId];
+      try {
+        const view = await gameApi.getRoom(stored.roomId, token);
+        expectedViewerRef.current = view.viewerPlayerId;
+        setRoom(view);
+      } catch {
+        resetToHall('你之前的游戏房间已不存在，已返回大厅');
+      }
+    };
+    void restore();
+    // Runs once on mount by design.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Drop seats that the server no longer knows (kicked, left, rematch cleanup) and keep control on a local seat,
+  // preferring whichever local seat is on turn so hot-seat play follows the turn order.
+  useEffect(() => {
+    if (room === null || session === null || session.roomId !== room.roomId) {
+      return;
+    }
+    const activeIds = new Set(room.players.filter((player) => player.status !== 'left').map((player) => player.id));
+    const seats = Object.fromEntries(Object.entries(session.seats).filter(([id]) => activeIds.has(id)));
+    const ids = Object.keys(seats);
+    const onTurn = room.currentPlayerId !== null && ids.includes(room.currentPlayerId) ? room.currentPlayerId : null;
+    const controlledPlayerId = onTurn ?? (ids.includes(session.controlledPlayerId) ? session.controlledPlayerId : ids[0] ?? '');
+    if (ids.length === Object.keys(session.seats).length && controlledPlayerId === session.controlledPlayerId) {
+      return;
+    }
+    setSession({ ...session, seats, controlledPlayerId });
+  }, [room, session, setSession]);
 
   const reconnectRef = useRef<{ attempts: number; timer: ReturnType<typeof setTimeout> | null; manualClose: boolean }>({ attempts: 0, timer: null, manualClose: false });
   const socketRef = useRef<WebSocket | null>(null);
+  const seatTokenRef = useRef<string | undefined>(seatToken);
+  seatTokenRef.current = seatToken;
+  const roomId = room?.roomId ?? null;
 
   useEffect(() => {
-    if (room === null) {
+    if (roomId === null) {
       setConnected(false);
       return;
     }
-
     reconnectRef.current.manualClose = false;
 
     const connect = () => {
-      const socket = new WebSocket(publicWsUrl(`/ws/rooms/${room.roomId}`));
+      const socket = new WebSocket(publicWsUrl(`/ws/rooms/${roomId}`));
       socketRef.current = socket;
 
       socket.addEventListener('open', () => {
         setConnected(true);
         reconnectRef.current.attempts = 0;
+        if (seatTokenRef.current !== undefined) {
+          socket.send(JSON.stringify({ type: 'auth', requestId: 'auth', seatToken: seatTokenRef.current }));
+        }
       });
 
-      socket.addEventListener('close', () => {
+      socket.addEventListener('close', (event) => {
         setConnected(false);
-        if (reconnectRef.current.manualClose) {
+        if (reconnectRef.current.manualClose || event.code === 4404 || event.code === 4410) {
           return;
         }
         const delay = Math.min(Math.pow(2, reconnectRef.current.attempts) * 1000, 30000);
@@ -166,20 +206,29 @@ export function useGameRoom() {
       });
 
       socket.addEventListener('message', (event) => {
+        let message: WsMessage;
         try {
-          const data = JSON.parse(String(event.data));
-          const message = data as WsMessage;
-          if (message.type === 'room_state' && message.room !== undefined) {
-            setRoom(message.room);
-          }
-          if (message.type === 'error') {
-            const nextError = { message: message.error ?? 'WebSocket error' };
-            setLastError(nextError);
-            setError(errorMessage(nextError));
-          }
+          message = JSON.parse(String(event.data)) as WsMessage;
         } catch {
           console.warn('[WS] Failed to parse message');
           return;
+        }
+        if (message.type === 'room_state' && message.room !== undefined) {
+          acceptRoom(message.room);
+          setOnlinePlayerIds(message.onlinePlayerIds ?? []);
+        } else if (message.type === 'room_closed' || message.error_code === 'room_not_found') {
+          resetToHall('房间已关闭，已返回大厅');
+        } else if (message.requestId === 'auth' && message.ok === false) {
+          // Our seat was revoked (kicked or rematch cleanup): fall back to spectating.
+          setSession((current) => {
+            if (current === null) return null;
+            const seats = { ...current.seats };
+            delete seats[current.controlledPlayerId];
+            const ids = Object.keys(seats);
+            return ids.length === 0 ? null : { ...current, seats, controlledPlayerId: ids[0]! };
+          });
+        } else if (message.type === 'error' || message.ok === false) {
+          reportError(new ApiError(message.error ?? 'WebSocket error', 0, message.error_code));
         }
       });
     };
@@ -192,12 +241,18 @@ export function useGameRoom() {
         clearTimeout(reconnectRef.current.timer);
         reconnectRef.current.timer = null;
       }
-      if (socketRef.current !== null) {
-        socketRef.current.close();
-        socketRef.current = null;
-      }
+      socketRef.current?.close();
+      socketRef.current = null;
     };
-  }, [room?.roomId]);
+  }, [acceptRoom, reportError, resetToHall, roomId, setSession]);
+
+  // Switching the controlled seat re-authenticates the same socket so the pushed view follows it.
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (socket !== null && socket.readyState === WebSocket.OPEN && seatToken !== undefined) {
+      socket.send(JSON.stringify({ type: 'auth', requestId: 'auth', seatToken }));
+    }
+  }, [seatToken]);
 
   const run = useCallback(async <T,>(task: () => Promise<T>, after?: (value: T) => void) => {
     setBusy(true);
@@ -208,76 +263,88 @@ export function useGameRoom() {
       after?.(value);
       return value;
     } catch (caught) {
-      const nextError = normalizeError(caught);
-      setLastError(nextError);
-      setError(errorMessage(nextError));
+      reportError(caught);
       return null;
     } finally {
       setBusy(false);
       void refreshRooms();
     }
-  }, [refreshRooms]);
+  }, [refreshRooms, reportError]);
 
   const createRoom = useCallback(async (input: { playerName: string; roomName?: string }) => {
     safeStorage.set(NAME_KEY, input.playerName);
     setPlayerName(input.playerName);
-    await run(() => gameApi.createRoom(input), (result) => {
-      setRoom(result.room);
-      setControlledPlayerId(result.playerId);
-      replaceLocalPlayerIds([result.playerId]);
-      safeStorage.set(ROOM_KEY, result.room.roomId);
-    });
-  }, [replaceLocalPlayerIds, run, setControlledPlayerId]);
+    await run(() => gameApi.createRoom(input), (grant) => adoptGrant(grant, false));
+  }, [adoptGrant, run]);
 
-  const joinRoom = useCallback(async (roomId: string, name = playerName) => {
+  const joinRoom = useCallback(async (targetRoomId: string, name = playerName) => {
     safeStorage.set(NAME_KEY, name);
     setPlayerName(name);
-    await run(() => gameApi.joinRoom(roomId, name), (result) => {
-      setRoom(result.room);
-      setControlledPlayerId(result.playerId);
-      replaceLocalPlayerIds([result.playerId]);
-      safeStorage.set(ROOM_KEY, result.room.roomId);
-    });
-  }, [playerName, replaceLocalPlayerIds, run, setControlledPlayerId]);
+    await run(() => gameApi.joinRoom(targetRoomId, name), (grant) => adoptGrant(grant, false));
+  }, [adoptGrant, playerName, run]);
 
-  const leaveLocalRoom = useCallback(() => {
-    safeStorage.remove(ROOM_KEY);
-    safeStorage.remove(PLAYER_KEY);
-    safeStorage.remove(LOCAL_PLAYERS_KEY);
-    setRoom(null);
-    setPlayerId('');
-    setLocalPlayerIds([]);
-  }, []);
+  const selectPlayer = useCallback((nextPlayerId: string) => {
+    setSession((current) => (current === null || current.seats[nextPlayerId] === undefined ? current : { ...current, controlledPlayerId: nextPlayerId }));
+  }, [setSession]);
+
+  /** Gives up every seat this device holds, then returns to the hall. */
+  const leaveRoom = useCallback(async () => {
+    if (room === null || session === null) {
+      resetToHall();
+      return;
+    }
+    const tokens = Object.values(session.seats);
+    await run(async () => {
+      for (const token of tokens) {
+        await gameApi.leaveRoom(room.roomId, token).catch((caught: unknown) => {
+          if (!(caught instanceof ApiError) || (caught.status !== 401 && caught.status !== 404)) throw caught;
+        });
+      }
+    }, () => resetToHall());
+  }, [resetToHall, room, run, session]);
 
   const startRoom = useCallback(async () => {
-    if (room === null || room.hostPlayerId === null || !localPlayerIds.includes(room.hostPlayerId)) return;
-    const hostPlayerId = room.hostPlayerId;
-    await run(() => gameApi.startRoom(room.roomId, hostPlayerId), setRoom);
-  }, [localPlayerIds, room, run]);
+    if (room === null || hostSeatToken === undefined) return;
+    await run(() => gameApi.startRoom(room.roomId, hostSeatToken), acceptRoom);
+  }, [acceptRoom, hostSeatToken, room, run]);
 
   const addDemoPlayer = useCallback(async () => {
-    if (room === null) return;
-    await run(() => gameApi.addDemoPlayer(room.roomId), (result) => {
-      setRoom(result.room);
-      rememberLocalPlayerId(result.playerId);
-      setControlledPlayerId(result.playerId);
-    });
-  }, [rememberLocalPlayerId, room, run, setControlledPlayerId]);
+    if (room === null || hostSeatToken === undefined) return;
+    await run(() => gameApi.addDemoPlayer(room.roomId, hostSeatToken), (grant) => adoptGrant(grant, true));
+  }, [adoptGrant, hostSeatToken, room, run]);
 
-  const takeTokens = useCallback(async (tokens: TokenKind[], options: ActionOptions = {}) => {
-    if (room === null || playerId === '') return null;
-    return await run(() => gameApi.takeTokens(room.roomId, playerId, tokens, options), setRoom);
-  }, [playerId, room, run]);
+  const kickPlayer = useCallback(async (targetPlayerId: string) => {
+    if (room === null || hostSeatToken === undefined) return;
+    await run(() => gameApi.kickPlayer(room.roomId, hostSeatToken, targetPlayerId), acceptRoom);
+  }, [acceptRoom, hostSeatToken, room, run]);
 
-  const reserveCard = useCallback(async (source: Extract<CardSource, { kind: 'market' | 'deck' }>, options: ActionOptions = {}) => {
-    if (room === null || playerId === '') return null;
-    return await run(() => gameApi.reserveCard(room.roomId, playerId, source, options), setRoom);
-  }, [playerId, room, run]);
+  const rematch = useCallback(async () => {
+    if (room === null || hostSeatToken === undefined) return;
+    await run(() => gameApi.rematch(room.roomId, hostSeatToken), acceptRoom);
+  }, [acceptRoom, hostSeatToken, room, run]);
 
-  const buyCard = useCallback(async (source: Exclude<CardSource, { kind: 'deck' }>, options: ActionOptions = {}) => {
-    if (room === null || playerId === '') return null;
-    return await run(() => gameApi.buyCard(room.roomId, playerId, source, options), setRoom);
-  }, [playerId, room, run]);
+  const withSeat = useCallback((task: (targetRoomId: string, token: string) => Promise<GameState>) => {
+    if (room === null || seatToken === undefined) return Promise.resolve(null);
+    return run(() => task(room.roomId, seatToken), acceptRoom);
+  }, [acceptRoom, room, run, seatToken]);
+
+  const takeTokens = useCallback((tokens: TokenKind[], options: ActionOptions = {}) =>
+    withSeat((id, token) => gameApi.takeTokens(id, token, tokens, options)), [withSeat]);
+
+  const reserveCard = useCallback((source: Extract<CardSource, { kind: 'market' | 'deck' }>, options: ActionOptions = {}) =>
+    withSeat((id, token) => gameApi.reserveCard(id, token, source, options)), [withSeat]);
+
+  const buyCard = useCallback((source: Exclude<CardSource, { kind: 'deck' }>, options: ActionOptions = {}) =>
+    withSeat((id, token) => gameApi.buyCard(id, token, source, options)), [withSeat]);
+
+  const passTurn = useCallback(() => withSeat((id, token) => gameApi.passTurn(id, token)), [withSeat]);
+
+  /** A link that hands the controlled seat to another device (anyone holding it can play this seat). */
+  const seatLink = useMemo(() => {
+    if (room === null || seatToken === undefined) return null;
+    const params = new URLSearchParams({ room: room.roomId, seat: seatToken });
+    return `${window.location.origin}${publicUrl('/')}?${params.toString()}`;
+  }, [room, seatToken]);
 
   return {
     room,
@@ -288,54 +355,59 @@ export function useGameRoom() {
     currentPlayer,
     localPlayers,
     activePlayer,
+    onlinePlayerIds,
     isMyTurn,
     isHost,
     busy,
     error,
     lastError,
     connected,
+    seatLink,
     setPlayerName,
     selectPlayer,
     refreshRooms,
     createRoom,
     joinRoom,
-    leaveLocalRoom,
+    leaveRoom,
     startRoom,
     addDemoPlayer,
+    kickPlayer,
+    rematch,
     takeTokens,
     reserveCard,
     buyCard,
+    passTurn,
   };
 }
 
-function readLocalPlayerIds(): string[] {
-  const raw = safeStorage.get(LOCAL_PLAYERS_KEY);
+function readSession(): SeatSession | null {
+  const raw = safeStorage.get(SESSION_KEY);
   if (raw === null) {
-    const legacyPlayerId = safeStorage.get(PLAYER_KEY);
-    return legacyPlayerId === null ? [] : [legacyPlayerId];
+    return null;
   }
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? unique(parsed.filter((id): id is string => typeof id === 'string')) : [];
+    const parsed = JSON.parse(raw) as Partial<SeatSession>;
+    if (typeof parsed.roomId !== 'string' || parsed.seats === null || typeof parsed.seats !== 'object') {
+      return null;
+    }
+    const seats = Object.fromEntries(Object.entries(parsed.seats).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+    const ids = Object.keys(seats);
+    if (ids.length === 0) {
+      return null;
+    }
+    const controlledPlayerId = typeof parsed.controlledPlayerId === 'string' && ids.includes(parsed.controlledPlayerId) ? parsed.controlledPlayerId : ids[0]!;
+    return { roomId: parsed.roomId, seats, controlledPlayerId };
   } catch {
-    return [];
+    return null;
   }
 }
 
-function writeLocalPlayerIds(playerIds: string[]): void {
-  if (playerIds.length === 0) {
-    safeStorage.remove(LOCAL_PLAYERS_KEY);
+function writeSession(session: SeatSession | null): void {
+  if (session === null) {
+    safeStorage.remove(SESSION_KEY);
     return;
   }
-  safeStorage.set(LOCAL_PLAYERS_KEY, JSON.stringify(unique(playerIds)));
-}
-
-function unique(playerIds: string[]): string[] {
-  return [...new Set(playerIds.filter((id) => id.length > 0))];
-}
-
-function sameIds(left: string[], right: string[]): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
+  safeStorage.set(SESSION_KEY, JSON.stringify(session));
 }
 
 function normalizeError(error: unknown): GameRoomError {

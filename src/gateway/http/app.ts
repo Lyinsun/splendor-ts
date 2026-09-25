@@ -1,18 +1,22 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import type { AppConfig } from '../../config/config.js';
-import {
-  GameRuleError,
-  SPECIAL_CARD_RANKS,
-  TOKEN_KINDS,
-  type CardSource,
-  type CardTier,
-  type EvolutionSelection,
-  type GameAction,
-  type SpecialCardRank,
-  type TokenKind,
-} from '../../game/domain/types.js';
 import type { AppServices } from '../../game/application/composition.js';
-import { RoomNotFoundError, roomErrorStatus } from '../../game/application/room-service.js';
+import { SeatAuthError } from '../../game/application/room-service.js';
+import {
+  asJsonObject,
+  displayNameField,
+  optionalClientActionId,
+  optionalDisplayNameField,
+  parseActionCommand,
+  PLAYER_NAME_MAX_LENGTH,
+  RequestValidationError,
+  ROOM_NAME_MAX_LENGTH,
+  stringField,
+  type ActionKind,
+  type JsonObject,
+} from '../protocol/action-dto.js';
+import { describeError } from '../protocol/errors.js';
 import { createDashboardAssetHandler, createSplendorAssetHandler, dashboardIndexHtml } from './dashboard-static.js';
 
 export interface HttpAppDependencies {
@@ -20,11 +24,32 @@ export interface HttpAppDependencies {
   services: AppServices;
 }
 
+const MAX_BODY_BYTES = 16 * 1024;
+
+/** Typed action endpoints kept for simple clients; `POST /actions` accepts any kind in the body. */
+const ACTION_ROUTES: Record<string, ActionKind> = {
+  'take-tokens': 'take_tokens',
+  reserve: 'reserve_card',
+  buy: 'buy_card',
+  pass: 'pass_turn',
+};
+
 export function createHttpApp(deps: HttpAppDependencies) {
   const app = new Hono();
+  const rooms = deps.services.rooms;
   const basePath = deps.config.http.publicBasePath;
   const route = (path: string) => `${basePath}${path}`;
 
+  app.onError((error, c) => {
+    const { status, body } = describeError(error);
+    return c.json(body, status as 400);
+  });
+  app.notFound((c) => c.json({ error_code: 'not_found', error: 'Route not found.' }, 404));
+
+  app.use(route('/v1/*'), bodyLimit({
+    maxSize: MAX_BODY_BYTES,
+    onError: (c) => c.json({ error_code: 'body_too_large', error: `Request body must be at most ${MAX_BODY_BYTES} bytes.` }, 413),
+  }));
   app.use(route('/dashboard-assets/*'), createDashboardAssetHandler(basePath));
   app.use(route('/assets/splendor-monsters/*'), createSplendorAssetHandler(basePath));
 
@@ -42,299 +67,89 @@ export function createHttpApp(deps: HttpAppDependencies) {
     }),
   );
 
-  app.get(route('/v1/rooms'), (c) => c.json(deps.services.rooms.listRooms()));
+  app.get(route('/v1/rooms'), (c) => c.json(rooms.listRooms()));
 
   app.post(route('/v1/rooms'), async (c) => {
-    try {
-      const body = await readJson(c.req);
-      const roomName = optionalStringField(body, 'roomName');
-      const result = deps.services.rooms.createRoom(roomName === undefined
-        ? { playerName: stringField(body, 'playerName', 'Trainer') }
-        : { playerName: stringField(body, 'playerName', 'Trainer'), roomName });
-      return c.json(result, 201);
-    } catch (error) {
-      return errorResponse(c, error);
-    }
+    const body = await readJson(c);
+    const playerName = displayNameField(body, 'playerName', PLAYER_NAME_MAX_LENGTH, 'Trainer');
+    const roomName = optionalDisplayNameField(body, 'roomName', ROOM_NAME_MAX_LENGTH);
+    return c.json(rooms.createRoom(roomName === undefined ? { playerName } : { playerName, roomName }), 201);
   });
 
-  app.get(route('/v1/rooms/:roomId'), (c) => {
-    try {
-      return c.json(deps.services.rooms.getRoom(pathParam(c.req.param('roomId'), 'roomId')));
-    } catch (error) {
-      return errorResponse(c, error);
-    }
-  });
+  app.get(route('/v1/rooms/:roomId'), (c) => c.json(rooms.getRoomView(param(c, 'roomId'), optionalSeatToken(c))));
 
-  app.get(route('/v1/rooms/:roomId/players/:playerId/legal-actions'), (c) => {
-    try {
-      return c.json(deps.services.rooms.listLegalActions(
-        pathParam(c.req.param('roomId'), 'roomId'),
-        pathParam(c.req.param('playerId'), 'playerId'),
-      ));
-    } catch (error) {
-      return errorResponse(c, error);
-    }
-  });
+  app.get(route('/v1/rooms/:roomId/legal-actions'), (c) => c.json(rooms.listLegalActions(param(c, 'roomId'), seatToken(c))));
 
   app.post(route('/v1/rooms/:roomId/join'), async (c) => {
-    try {
-      const body = await readJson(c.req);
-      const result = deps.services.rooms.joinRoom(pathParam(c.req.param('roomId'), 'roomId'), stringField(body, 'playerName', 'Trainer'));
-      return c.json(result);
-    } catch (error) {
-      return errorResponse(c, error);
-    }
+    const body = await readJson(c);
+    return c.json(rooms.joinRoom(param(c, 'roomId'), displayNameField(body, 'playerName', PLAYER_NAME_MAX_LENGTH, 'Trainer')));
   });
 
-  app.post(route('/v1/rooms/:roomId/demo-player'), (c) => {
-    try {
-      return c.json(deps.services.rooms.addDemoPlayer(pathParam(c.req.param('roomId'), 'roomId')));
-    } catch (error) {
-      return errorResponse(c, error);
-    }
+  app.post(route('/v1/rooms/:roomId/demo-player'), (c) => c.json(rooms.addDemoPlayer(param(c, 'roomId'), seatToken(c))));
+
+  app.post(route('/v1/rooms/:roomId/start'), (c) => c.json(rooms.startRoom(param(c, 'roomId'), seatToken(c))));
+
+  app.post(route('/v1/rooms/:roomId/leave'), (c) => c.json({ room: rooms.leaveRoom(param(c, 'roomId'), seatToken(c)) }));
+
+  app.post(route('/v1/rooms/:roomId/kick'), async (c) => {
+    const body = await readJson(c);
+    return c.json(rooms.kickPlayer(param(c, 'roomId'), seatToken(c), stringField(body, 'playerId')));
   });
 
-  app.post(route('/v1/rooms/:roomId/start'), async (c) => {
-    try {
-      const body = await readJson(c.req);
-      return c.json(deps.services.rooms.startRoom(pathParam(c.req.param('roomId'), 'roomId'), stringField(body, 'playerId')));
-    } catch (error) {
-      return errorResponse(c, error);
-    }
+  app.post(route('/v1/rooms/:roomId/rematch'), (c) => c.json(rooms.rematch(param(c, 'roomId'), seatToken(c))));
+
+  app.post(route('/v1/rooms/:roomId/actions'), async (c) => {
+    const body = await readJson(c);
+    return c.json(rooms.applyAction(param(c, 'roomId'), seatToken(c), parseActionCommand(body), optionalClientActionId(body)));
   });
 
-  app.post(route('/v1/rooms/:roomId/actions/take-tokens'), async (c) => {
-    try {
-      const body = await readJson(c.req);
-      const action: GameAction = {
-        kind: 'take_tokens',
-        playerId: stringField(body, 'playerId'),
-        tokens: tokenArrayField(body, 'tokens'),
-        ...actionOptionsField(body),
-      };
-      return c.json(deps.services.rooms.applyAction(pathParam(c.req.param('roomId'), 'roomId'), action));
-    } catch (error) {
-      return errorResponse(c, error);
+  app.post(route('/v1/rooms/:roomId/actions/:kind'), async (c) => {
+    const kind = ACTION_ROUTES[param(c, 'kind')];
+    if (kind === undefined) {
+      throw new RequestValidationError(`Unknown action route: ${param(c, 'kind')}`, 'invalid_action_kind');
     }
-  });
-
-  app.post(route('/v1/rooms/:roomId/actions/reserve'), async (c) => {
-    try {
-      const body = await readJson(c.req);
-      const action: GameAction = {
-        kind: 'reserve_card',
-        playerId: stringField(body, 'playerId'),
-        source: reserveCardSourceField(body),
-        ...actionOptionsField(body),
-      };
-      return c.json(deps.services.rooms.applyAction(pathParam(c.req.param('roomId'), 'roomId'), action));
-    } catch (error) {
-      return errorResponse(c, error);
-    }
-  });
-
-  app.post(route('/v1/rooms/:roomId/actions/buy'), async (c) => {
-    try {
-      const body = await readJson(c.req);
-      const action: GameAction = {
-        kind: 'buy_card',
-        playerId: stringField(body, 'playerId'),
-        source: buyCardSourceField(body),
-        ...actionOptionsField(body),
-      };
-      return c.json(deps.services.rooms.applyAction(pathParam(c.req.param('roomId'), 'roomId'), action));
-    } catch (error) {
-      return errorResponse(c, error);
-    }
+    const body = kind === 'pass_turn' ? await readOptionalJson(c) : await readJson(c);
+    return c.json(rooms.applyAction(param(c, 'roomId'), seatToken(c), parseActionCommand(body, kind), optionalClientActionId(body)));
   });
 
   return app;
 }
 
-function errorResponse(c: { json: (payload: unknown, status?: number) => Response }, error: unknown): Response {
-  const status = roomErrorStatus(error);
-  if (error instanceof GameRuleError) {
-    return c.json({ error_code: error.code, error: error.message }, status);
+/** Paths are built from the configurable base path, so Hono cannot infer param types. */
+function param(c: Context, name: string): string {
+  const value = c.req.param(name);
+  if (value === undefined) {
+    throw new RequestValidationError(`Missing path parameter: ${name}`);
   }
-  if (error instanceof RoomNotFoundError) {
-    return c.json({ error_code: 'room_not_found', error: error.message }, status);
-  }
-  return c.json({ error_code: 'internal_error', error: errorMessage(error) }, status);
+  return value;
 }
 
-async function readJson(req: { json: () => Promise<unknown> }): Promise<Record<string, unknown>> {
-  const body = await req.json();
-  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-    throw new GameRuleError('Request body must be a JSON object.', 'invalid_json_body');
-  }
-  return body as Record<string, unknown>;
+async function readJson(c: Context): Promise<JsonObject> {
+  return asJsonObject(await c.req.json());
 }
 
-function stringField(body: Record<string, unknown>, field: string, fallback?: string): string {
-  const value = body[field];
-  if (typeof value === 'string' && value.trim() !== '') {
-    return value.trim();
-  }
-  if (fallback !== undefined) {
-    return fallback;
-  }
-  throw new GameRuleError(`Missing string field: ${field}`, 'invalid_request');
+async function readOptionalJson(c: Context): Promise<JsonObject> {
+  const text = await c.req.text();
+  return text.trim() === '' ? {} : asJsonObject(JSON.parse(text));
 }
 
-function pathParam(value: string | undefined, field: string): string {
-  if (typeof value === 'string' && value.trim() !== '') {
-    return value;
-  }
-  throw new GameRuleError(`Missing path parameter: ${field}`, 'invalid_request');
-}
-
-function optionalStringField(body: Record<string, unknown>, field: string): string | undefined {
-  const value = body[field];
-  if (typeof value === 'string' && value.trim() !== '') {
-    return value.trim();
-  }
-  return undefined;
-}
-
-function tokenArrayField(body: Record<string, unknown>, field: string): TokenKind[] {
-  const value = body[field];
-  if (!Array.isArray(value)) {
-    throw new GameRuleError(`Missing array field: ${field}`, 'invalid_request');
-  }
-  return value.map((item) => {
-    if (typeof item !== 'string' || !TOKEN_KINDS.includes(item as TokenKind)) {
-      throw new GameRuleError(`Invalid token kind: ${String(item)}`, 'invalid_token');
+/** Seat tokens travel as `Authorization: Bearer <token>` (or `X-Seat-Token`), never in URLs or bodies. */
+function optionalSeatToken(c: Context): string | null {
+  const header = c.req.header('authorization');
+  if (header !== undefined) {
+    const match = /^Bearer\s+(\S+)$/i.exec(header.trim());
+    if (match?.[1] === undefined) {
+      throw new SeatAuthError('Authorization header must be "Bearer <seatToken>".');
     }
-    return item as TokenKind;
-  });
+    return match[1];
+  }
+  return c.req.header('x-seat-token')?.trim() || null;
 }
 
-function optionalTokenArrayField(body: Record<string, unknown>, field: string): TokenKind[] | undefined {
-  if (!(field in body)) {
-    return undefined;
+function seatToken(c: Context): string {
+  const token = optionalSeatToken(c);
+  if (token === null) {
+    throw new SeatAuthError();
   }
-  return tokenArrayField(body, field);
-}
-
-function reserveCardSourceField(body: Record<string, unknown>): Extract<CardSource, { kind: 'market' | 'deck' }> {
-  const source = cardSourceField(body);
-  if (source.kind === 'market' || source.kind === 'deck') {
-    return source;
-  }
-  throw new GameRuleError('Only normal market or deck cards can be reserved.', 'invalid_card_source');
-}
-
-function buyCardSourceField(body: Record<string, unknown>): Exclude<CardSource, { kind: 'deck' }> {
-  const source = cardSourceField(body);
-  if (source.kind === 'deck') {
-    throw new GameRuleError('Deck cards must be reserved before buying.', 'invalid_card_source');
-  }
-  return source;
-}
-
-function cardSourceField(body: Record<string, unknown>): CardSource {
-  const raw = body.source;
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new GameRuleError('Missing card source.', 'invalid_card_source');
-  }
-  const source = raw as Record<string, unknown>;
-  const kind = source.kind;
-  if (kind === 'reserved') {
-    return {
-      kind: 'reserved',
-      cardId: stringField(source, 'cardId'),
-    };
-  }
-  if (kind === 'market') {
-    return {
-      kind: 'market',
-      tier: cardTierField(source, 'tier'),
-      cardId: stringField(source, 'cardId'),
-    };
-  }
-  if (kind === 'deck') {
-    return {
-      kind: 'deck',
-      tier: cardTierField(source, 'tier'),
-    };
-  }
-  if (kind === 'special_market') {
-    return {
-      kind: 'special_market',
-      rank: specialCardRankField(source, 'rank'),
-      cardId: stringField(source, 'cardId'),
-    };
-  }
-  throw new GameRuleError('Invalid card source kind.', 'invalid_card_source');
-}
-
-function actionOptionsField(body: Record<string, unknown>): { discardTokens?: TokenKind[]; evolution?: EvolutionSelection | null } {
-  const options: { discardTokens?: TokenKind[]; evolution?: EvolutionSelection | null } = {};
-  const discardTokens = optionalTokenArrayField(body, 'discardTokens');
-  if (discardTokens !== undefined) {
-    options.discardTokens = discardTokens;
-  }
-  if ('evolution' in body) {
-    options.evolution = evolutionSelectionField(body.evolution);
-  }
-  return options;
-}
-
-function evolutionSelectionField(raw: unknown): EvolutionSelection | null {
-  if (raw === null) {
-    return null;
-  }
-  if (raw === undefined) {
-    return null;
-  }
-  if (typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new GameRuleError('Evolution selection must be an object or null.', 'invalid_evolution_selection');
-  }
-  const input = raw as Record<string, unknown>;
-  const to = input.to;
-  if (typeof to !== 'object' || to === null || Array.isArray(to)) {
-    throw new GameRuleError('Evolution target is required.', 'invalid_evolution_selection');
-  }
-  const target = to as Record<string, unknown>;
-  const kind = target.kind;
-  if (kind === 'reserved') {
-    return {
-      fromCardId: stringField(input, 'fromCardId'),
-      to: {
-        kind: 'reserved',
-        cardId: stringField(target, 'cardId'),
-      },
-    };
-  }
-  if (kind === 'market') {
-    return {
-      fromCardId: stringField(input, 'fromCardId'),
-      to: {
-        kind: 'market',
-        tier: cardTierField(target, 'tier'),
-        cardId: stringField(target, 'cardId'),
-      },
-    };
-  }
-  throw new GameRuleError('Invalid evolution target kind.', 'invalid_evolution_selection');
-}
-
-function cardTierField(body: Record<string, unknown>, field: string): CardTier {
-  const value = body[field];
-  if (value === 1 || value === 2 || value === 3) {
-    return value;
-  }
-  throw new GameRuleError('Card tier must be 1, 2, or 3.', 'invalid_card_tier');
-}
-
-function specialCardRankField(body: Record<string, unknown>, field: string): SpecialCardRank {
-  const value = body[field];
-  if (typeof value === 'string' && SPECIAL_CARD_RANKS.includes(value as SpecialCardRank)) {
-    return value as SpecialCardRank;
-  }
-  throw new GameRuleError('Special card rank must be rare or legendary.', 'invalid_special_card_rank');
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return token;
 }

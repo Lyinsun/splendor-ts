@@ -1,4 +1,4 @@
-import { applyGameAction } from './engine.js';
+import { applyGameAction, MAX_TOKENS_PER_PLAYER } from './engine.js';
 import {
   CARD_TIERS,
   ELEMENTS,
@@ -52,7 +52,9 @@ export function listLegalGameActions(state: GameState, playerId: string): LegalG
   const options = new Map<string, LegalGameActionOption>();
 
   for (const baseAction of baseActions) {
-    for (const discardTokens of discardOptions) {
+    // Only the exact discard size required after this action can be legal, so skip the rest of the search space.
+    const discardSize = requiredDiscardSize(state, baseAction);
+    for (const discardTokens of discardOptions.filter((option) => option.length === discardSize)) {
       for (const evolution of evolutionOptions) {
         const action = withSettlementOptions(baseAction, discardTokens, evolution);
         if (!isActionLegal(state, action)) {
@@ -68,6 +70,13 @@ export function listLegalGameActions(state: GameState, playerId: string): LegalG
           });
         }
       }
+    }
+  }
+
+  if (options.size === 0) {
+    const pass: GameAction = { kind: 'pass_turn', playerId };
+    if (isActionLegal(state, pass)) {
+      options.set('pass', { id: 'pass', kind: 'pass_turn', action: pass, summary: 'Pass (no other action available)' });
     }
   }
 
@@ -254,6 +263,21 @@ function evolutionCandidates(state: GameState, playerId: string): EvolutionSelec
   return [...candidates.values()];
 }
 
+function requiredDiscardSize(state: GameState, action: GameAction): number {
+  const player = state.players.find((entry) => entry.id === action.playerId);
+  if (player === undefined) {
+    return 0;
+  }
+  const held = TOKEN_KINDS.reduce((sum, token) => sum + player.tokens[token], 0);
+  let gained = 0;
+  if (action.kind === 'take_tokens') {
+    gained = action.tokens.length;
+  } else if (action.kind === 'reserve_card') {
+    gained = state.board.bank.prism > 0 ? 1 : 0;
+  }
+  return Math.max(held + gained - MAX_TOKENS_PER_PLAYER, 0);
+}
+
 function withSettlementOptions(baseAction: GameAction, discardTokens: TokenKind[], evolution: EvolutionSelection | null): GameAction {
   const options = {
     ...(discardTokens.length > 0 ? { discardTokens } : {}),
@@ -281,6 +305,9 @@ function actionId(action: GameAction): string {
   if (action.kind === 'reserve_card') {
     return ['reserve', sourceId(action.source), settlementId(action)].filter(Boolean).join(':');
   }
+  if (action.kind === 'pass_turn') {
+    return 'pass';
+  }
   return ['buy', sourceId(action.source), settlementId(action)].filter(Boolean).join(':');
 }
 
@@ -297,7 +324,7 @@ function sourceId(source: CardSource): string {
   return `special:${source.rank}:${source.cardId}`;
 }
 
-function settlementId(action: GameAction): string {
+function settlementId(action: Exclude<GameAction, { kind: 'pass_turn' }>): string {
   const fragments = [];
   if (action.discardTokens !== undefined && action.discardTokens.length > 0) {
     fragments.push(`discard:${action.discardTokens.join(',')}`);
@@ -324,6 +351,9 @@ function actionSummary(state: GameState, action: GameAction): string {
       return `Reserve the top tier ${action.source.tier} card`;
     }
     return `Reserve ${cardName(state, action.source)}`;
+  }
+  if (action.kind === 'pass_turn') {
+    return 'Pass';
   }
   return `Buy ${cardName(state, action.source)}`;
 }

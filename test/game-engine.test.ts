@@ -287,7 +287,7 @@ describe('game engine', () => {
     game.board.market[2][0] = to;
 
     const legal = listLegalGameActions(game, 'p1');
-    expect(legal.actions.some((entry) => entry.action.evolution?.fromCardId === from.id && entry.action.evolution.to.kind === 'market' && entry.action.evolution.to.cardId === to.id)).toBe(true);
+    expect(legal.actions.some((entry) => "evolution" in entry.action && entry.action.evolution?.fromCardId === from.id && entry.action.evolution.to.kind === 'market' && entry.action.evolution.to.cardId === to.id)).toBe(true);
 
     const next = applyGameAction(game, {
       kind: 'take_tokens',
@@ -370,7 +370,7 @@ describe('game engine', () => {
     const legal = listLegalGameActions(game, 'p1');
 
     expect(legal.actions.some((entry) => entry.action.kind === 'buy_card' && entry.action.source.kind === 'special_market' && entry.action.source.cardId === rare.id)).toBe(true);
-    expect(legal.actions.some((entry) => entry.action.evolution?.fromCardId === from.id && entry.action.evolution.to.kind === 'market' && entry.action.evolution.to.cardId === to.id)).toBe(true);
+    expect(legal.actions.some((entry) => "evolution" in entry.action && entry.action.evolution?.fromCardId === from.id && entry.action.evolution.to.kind === 'market' && entry.action.evolution.to.cardId === to.id)).toBe(true);
   });
 
   it('rejects actions from a player who does not own the current turn', () => {

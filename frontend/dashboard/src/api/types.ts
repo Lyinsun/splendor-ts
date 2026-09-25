@@ -37,14 +37,32 @@ export interface GymLeader {
   requirement: ElementCost;
 }
 
+/** Another player's face-down reservation: the server only reveals its tier. */
+export interface HiddenCard {
+  id: string;
+  tier: CardTier;
+  hidden: true;
+}
+
+export type ReservedCard = CompanionCard | HiddenCard;
+
+export function isHiddenCard(card: ReservedCard): card is HiddenCard {
+  return 'hidden' in card && card.hidden === true;
+}
+
+export function visibleCards(cards: ReservedCard[]): CompanionCard[] {
+  return cards.filter((card): card is CompanionCard => !isHiddenCard(card));
+}
+
 export interface PlayerState {
   id: string;
   name: string;
   order: number;
+  status: 'active' | 'left';
   tokens: TokenBank;
   bonuses: Record<Element, number>;
   tableau: CompanionCard[];
-  reserved: CompanionCard[];
+  reserved: ReservedCard[];
   evolutionRecords: EvolutionRecord[];
   gymLeaders: GymLeader[];
   score: number;
@@ -52,9 +70,9 @@ export interface PlayerState {
 
 export interface BoardState {
   bank: TokenBank;
-  decks: Record<CardTier, CompanionCard[]>;
+  deckCounts: Record<CardTier, number>;
   market: Record<CardTier, CompanionCard[]>;
-  specialDecks: Record<SpecialCardRank, CompanionCard[]>;
+  specialDeckCounts: Record<SpecialCardRank, number>;
   specialMarket: Record<SpecialCardRank, CompanionCard[]>;
   gymLeaders: GymLeader[];
 }
@@ -72,8 +90,14 @@ export interface GameLogEntry {
   createdAt: string;
 }
 
+/** The room as projected for one viewer (see server `projectRoomView`). */
 export interface GameState {
   roomId: string;
+  version: number;
+  maxPlayers: number;
+  /** null when viewing as a spectator. */
+  viewerPlayerId: string | null;
+  viewerCanPass: boolean;
   roomName: string;
   status: 'lobby' | 'playing' | 'finished';
   players: PlayerState[];
@@ -155,7 +179,11 @@ export type GameAction =
       kind: 'buy_card';
       playerId: string;
       source: Exclude<CardSource, { kind: 'deck' }>;
-    } & ActionOptions);
+    } & ActionOptions)
+  | {
+      kind: 'pass_turn';
+      playerId: string;
+    };
 
 export interface LegalGameActionOption {
   id: string;
@@ -169,4 +197,11 @@ export interface LegalGameActionList {
   playerId: string;
   turn: number;
   actions: LegalGameActionOption[];
+}
+
+/** Returned only to the client that claimed a seat; the token is the seat's credential. */
+export interface SeatGrant {
+  room: GameState;
+  playerId: string;
+  seatToken: string;
 }

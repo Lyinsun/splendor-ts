@@ -7,7 +7,8 @@ import type { Context, MiddlewareHandler } from 'hono';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '../../..');
-const dashboardDist = path.join(projectRoot, 'dist/dashboard');
+// Overridable so a staging build can be served without touching the live dist/dashboard.
+const dashboardDist = path.resolve(projectRoot, process.env.SPLENDOR_DASHBOARD_DIST?.trim() || 'dist/dashboard');
 const projectAssetsRoot = path.join(projectRoot, 'assets/splendor-monsters');
 
 export async function dashboardIndexHtml(publicBasePath = ''): Promise<string> {

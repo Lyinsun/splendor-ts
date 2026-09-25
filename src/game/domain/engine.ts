@@ -37,6 +37,7 @@ export interface LobbyPlayerInput {
 export function createLobbyState(roomId: string, roomName: string, host: LobbyPlayerInput, now = new Date().toISOString()): GameState {
   return {
     roomId,
+    version: 1,
     roomName,
     status: 'lobby',
     players: [createPlayer(host, 0)],
@@ -50,7 +51,7 @@ export function createLobbyState(roomId: string, roomName: string, host: LobbyPl
     winnerIds: [],
     logs: [
       {
-        id: `${roomId}-lobby-created`,
+        id: `${roomId}-1`,
         turn: 0,
         message: `${host.name} created the training table.`,
         createdAt: now,
@@ -76,7 +77,7 @@ export function addPlayerToLobby(state: GameState, player: LobbyPlayerInput, now
   return next;
 }
 
-export function startGame(state: GameState, playerId: string, now = new Date().toISOString()): GameState {
+export function startGame(state: GameState, playerId: string, now = new Date().toISOString(), seed = state.roomId): GameState {
   const next = cloneState(state);
   ensureStatus(next, 'lobby');
   if (next.hostPlayerId !== playerId) {
@@ -86,7 +87,7 @@ export function startGame(state: GameState, playerId: string, now = new Date().t
     throw new GameRuleError('At least two players are required.', 'not_enough_players');
   }
   next.players = next.players.map((player, index) => createPlayer({ id: player.id, name: player.name }, index));
-  next.board = createInitialBoard(next.roomId, next.players.length);
+  next.board = createInitialBoard(seed, next.players.length);
   next.status = 'playing';
   next.currentPlayerId = next.players[0]?.id ?? null;
   next.turn = 1;
@@ -103,6 +104,16 @@ export function applyGameAction(state: GameState, action: GameAction, now = new 
   ensureStatus(next, 'playing');
   const player = ensureCurrentPlayer(next, action.playerId);
 
+  if (action.kind === 'pass_turn') {
+    if (hasMainAction(next, player)) {
+      throw new GameRuleError('Passing is only allowed when no take, reserve, or buy action is possible.', 'pass_not_allowed');
+    }
+    appendLog(next, `${player.name} had no available action and passed.`, now);
+    handleEndOfTurn(next, player, now);
+    next.updatedAt = now;
+    return next;
+  }
+
   if (action.kind === 'take_tokens') {
     takeTokens(next, player, action.tokens, now);
   } else if (action.kind === 'reserve_card') {
@@ -117,6 +128,96 @@ export function applyGameAction(state: GameState, action: GameAction, now = new 
   handleEndOfTurn(next, player, now);
   next.updatedAt = now;
   return next;
+}
+
+/** Removes a seat before the game starts (voluntary leave or host kick). Host passes to the next seat. */
+export function removePlayerFromLobby(state: GameState, playerId: string, now = new Date().toISOString()): GameState {
+  const next = cloneState(state);
+  ensureStatus(next, 'lobby');
+  const player = next.players.find((entry) => entry.id === playerId);
+  if (player === undefined) {
+    throw new GameRuleError('Player not found.', 'player_not_found');
+  }
+  next.players = next.players.filter((entry) => entry.id !== playerId).map((entry, index) => ({ ...entry, order: index }));
+  if (next.hostPlayerId === playerId) {
+    next.hostPlayerId = next.players[0]?.id ?? null;
+  }
+  appendLog(next, `${player.name} left the table.`, now);
+  next.updatedAt = now;
+  return next;
+}
+
+export function kickPlayerFromLobby(state: GameState, hostPlayerId: string, targetPlayerId: string, now = new Date().toISOString()): GameState {
+  ensureHost(state, hostPlayerId);
+  if (hostPlayerId === targetPlayerId) {
+    throw new GameRuleError('The host cannot kick themselves; leave the room instead.', 'cannot_kick_self');
+  }
+  return removePlayerFromLobby(state, targetPlayerId, now);
+}
+
+/**
+ * A player abandons a running game. Their seat stays for scoring history but is skipped;
+ * the game ends early when fewer than two active players remain.
+ */
+export function abandonGame(state: GameState, playerId: string, now = new Date().toISOString()): GameState {
+  const next = cloneState(state);
+  ensureStatus(next, 'playing');
+  const player = next.players.find((entry) => entry.id === playerId);
+  if (player === undefined || player.status !== 'active') {
+    throw new GameRuleError('Player not found.', 'player_not_found');
+  }
+  player.status = 'left';
+  appendLog(next, `${player.name} left the game.`, now);
+  if (next.hostPlayerId === playerId) {
+    next.hostPlayerId = activePlayers(next)[0]?.id ?? null;
+  }
+  if (next.currentPlayerId === playerId) {
+    advanceTurn(next, player, now);
+  } else if (activePlayers(next).length < MIN_PLAYERS) {
+    finishGame(next, now);
+  }
+  next.updatedAt = now;
+  return next;
+}
+
+/** Host sends a finished table back to the lobby with the same active players. */
+export function returnToLobby(state: GameState, hostPlayerId: string, now = new Date().toISOString()): GameState {
+  ensureStatus(state, 'finished');
+  ensureHost(state, hostPlayerId);
+  const next = cloneState(state);
+  next.players = next.players
+    .filter((player) => player.status === 'active')
+    .map((player, index) => createPlayer({ id: player.id, name: player.name }, index));
+  next.board = createEmptyBoard();
+  next.status = 'lobby';
+  next.currentPlayerId = null;
+  next.turn = 0;
+  next.round = 1;
+  next.endGameTriggeredBy = null;
+  next.winnerIds = [];
+  appendLog(next, 'The table is ready for a rematch.', now);
+  next.updatedAt = now;
+  return next;
+}
+
+/** True when the player can take tokens, reserve, or buy; otherwise `pass_turn` is the only legal move. */
+export function hasMainAction(state: GameState, player: PlayerState): boolean {
+  const available = ELEMENTS.filter((element) => state.board.bank[element] > 0);
+  if (available.length >= 3 || available.some((element) => state.board.bank[element] >= 4)) {
+    return true;
+  }
+  if (available.length === 2 && available.some((element) => state.board.bank[element] >= 2)) {
+    return true;
+  }
+  if (player.reserved.length < MAX_RESERVED_CARDS && CARD_TIERS.some((tier) => state.board.market[tier].length > 0 || state.board.decks[tier].length > 0)) {
+    return true;
+  }
+  const buyable = [
+    ...CARD_TIERS.flatMap((tier) => state.board.market[tier]),
+    ...SPECIAL_CARD_RANKS.flatMap((rank) => state.board.specialMarket[rank]),
+    ...player.reserved,
+  ];
+  return buyable.some((card) => computeAffordableTokens(player, card).missing === 0);
 }
 
 export function computeAffordableTokens(player: PlayerState, card: CompanionCard): { colored: Partial<Record<Element, number>>; prism: number; missing: number } {
@@ -171,10 +272,12 @@ function createPlayer(input: LobbyPlayerInput, order: number): PlayerState {
     id: input.id,
     name: input.name.trim() || `Trainer ${order + 1}`,
     order,
+    status: 'active',
     tokens: emptyTokenBank(),
     bonuses: createElementCounter(),
     tableau: [],
     reserved: [],
+    hiddenReservedIds: [],
     evolutionRecords: [],
     gymLeaders: [],
     score: 0,
@@ -277,6 +380,9 @@ function reserveCard(state: GameState, player: PlayerState, source: Extract<Card
   const prismGain = state.board.bank.prism > 0 ? 1 : 0;
   const located = locateReservableCard(state, source);
   player.reserved.push(located.card);
+  if (source.kind === 'deck') {
+    player.hiddenReservedIds.push(located.card.id);
+  }
   located.remove();
   if (source.kind === 'market') {
     refillMarket(state.board, source.tier);
@@ -285,7 +391,8 @@ function reserveCard(state: GameState, player: PlayerState, source: Extract<Card
     state.board.bank.prism -= 1;
     player.tokens.prism += 1;
   }
-  appendLog(state, `${player.name} reserved ${located.card.name}${prismGain > 0 ? ' and gained a prism' : ''}.`, now);
+  const reservedLabel = source.kind === 'deck' ? `a face-down tier ${source.tier} card` : located.card.name;
+  appendLog(state, `${player.name} reserved ${reservedLabel}${prismGain > 0 ? ' and gained a prism' : ''}.`, now);
 }
 
 function buyCard(state: GameState, player: PlayerState, source: Exclude<CardSource, { kind: 'deck' }>, now: string): void {
@@ -356,6 +463,7 @@ function locateBuyCard(state: GameState, player: PlayerState, source: Exclude<Ca
       card,
       remove: () => {
         player.reserved.splice(cardIndex, 1);
+        player.hiddenReservedIds = player.hiddenReservedIds.filter((id) => id !== card.id);
       },
     };
   }
@@ -483,6 +591,7 @@ function locateEvolutionTarget(
       card,
       remove: () => {
         player.reserved.splice(cardIndex, 1);
+        player.hiddenReservedIds = player.hiddenReservedIds.filter((id) => id !== card.id);
       },
     };
   }
@@ -512,13 +621,22 @@ function handleEndOfTurn(state: GameState, player: PlayerState, now: string): vo
     appendLog(state, `${player.name} reached ${state.targetScore} glory. The current round will finish.`, now);
   }
 
+  advanceTurn(state, player, now);
+}
+
+function advanceTurn(state: GameState, player: PlayerState, now: string): void {
+  if (activePlayers(state).length < MIN_PLAYERS) {
+    finishGame(state, now);
+    return;
+  }
   const nextPlayer = nextTurnPlayer(state, player);
+  const wrapped = nextPlayer.order <= player.order;
   state.turn += 1;
-  if (nextPlayer.order === 0) {
+  if (wrapped) {
     state.round += 1;
   }
 
-  if (state.endGameTriggeredBy !== null && nextPlayer.order === 0) {
+  if (state.endGameTriggeredBy !== null && wrapped) {
     finishGame(state, now);
     return;
   }
@@ -532,8 +650,9 @@ function finishGame(state: GameState, now: string): void {
   for (const player of state.players) {
     recalculatePlayer(player);
   }
-  const bestScore = Math.max(...state.players.map((player) => player.score));
-  let contenders = state.players.filter((player) => player.score === bestScore);
+  const eligible = activePlayers(state).length > 0 ? activePlayers(state) : state.players;
+  const bestScore = Math.max(...eligible.map((player) => player.score));
+  let contenders = eligible.filter((player) => player.score === bestScore);
   const mostEvolutions = Math.max(...contenders.map((player) => player.evolutionRecords.length));
   contenders = contenders.filter((player) => player.evolutionRecords.length === mostEvolutions);
   const mostPokemon = Math.max(...contenders.map((player) => player.tableau.length));
@@ -543,12 +662,18 @@ function finishGame(state: GameState, now: string): void {
 }
 
 function nextTurnPlayer(state: GameState, player: PlayerState): PlayerState {
-  const nextOrder = (player.order + 1) % state.players.length;
-  const nextPlayer = state.players.find((candidate) => candidate.order === nextOrder);
-  if (nextPlayer === undefined) {
-    throw new GameRuleError('Next player could not be resolved.', 'turn_order_corrupt');
+  for (let step = 1; step <= state.players.length; step += 1) {
+    const nextOrder = (player.order + step) % state.players.length;
+    const candidate = state.players.find((entry) => entry.order === nextOrder);
+    if (candidate !== undefined && candidate.status === 'active') {
+      return candidate;
+    }
   }
-  return nextPlayer;
+  throw new GameRuleError('Next player could not be resolved.', 'turn_order_corrupt');
+}
+
+function activePlayers(state: GameState): PlayerState[] {
+  return state.players.filter((player) => player.status === 'active');
 }
 
 function refillMarket(board: BoardState, tier: CardTier): void {
@@ -597,6 +722,12 @@ function hasEvolutionRequirement(player: PlayerState, requirement: ElementCost):
   return ELEMENTS.every((element) => player.bonuses[element] >= (requirement[element] ?? 0));
 }
 
+function ensureHost(state: GameState, playerId: string): void {
+  if (state.hostPlayerId !== playerId) {
+    throw new GameRuleError('Only the host can do this.', 'host_only');
+  }
+}
+
 function ensureStatus(state: GameState, status: GameState['status']): void {
   if (state.status !== status) {
     throw new GameRuleError(`Room must be ${status} for this operation.`, 'invalid_status');
@@ -608,7 +739,7 @@ function ensureCurrentPlayer(state: GameState, playerId: string): PlayerState {
     throw new GameRuleError('It is not this player turn.', 'not_current_turn');
   }
   const player = state.players.find((candidate) => candidate.id === playerId);
-  if (player === undefined) {
+  if (player === undefined || player.status !== 'active') {
     throw new GameRuleError('Player not found.', 'player_not_found');
   }
   return player;
@@ -616,12 +747,18 @@ function ensureCurrentPlayer(state: GameState, playerId: string): PlayerState {
 
 function appendLog(state: GameState, message: string, now: string): void {
   const entry: GameLogEntry = {
-    id: `${state.roomId}-${state.logs.length + 1}-${state.turn}`,
+    id: `${state.roomId}-${nextLogSequence(state)}`,
     turn: state.turn,
     message,
     createdAt: now,
   };
   state.logs = [entry, ...state.logs].slice(0, 80);
+}
+
+function nextLogSequence(state: GameState): number {
+  const latest = state.logs[0]?.id.split('-').at(-1);
+  const parsed = latest === undefined ? Number.NaN : Number.parseInt(latest, 10);
+  return (Number.isFinite(parsed) ? parsed : state.logs.length) + 1;
 }
 
 function cloneState(state: GameState): GameState {

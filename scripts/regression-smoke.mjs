@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { addPlayerToLobby, applyGameAction, createLobbyState, startGame } from '../src/game/domain/engine.ts';
@@ -7,6 +10,8 @@ import { createElementCounter, emptyTokenBank } from '../src/game/domain/tokens.
 const HOST = process.env.SPLENDOR_REGRESSION_HOST ?? '127.0.0.1';
 const PORT = Number.parseInt(process.env.SPLENDOR_REGRESSION_PORT ?? '29988', 10);
 const BASE_URL = `http://${HOST}:${PORT}`;
+// Throwaway room store so the smoke run never touches data/rooms.db.
+const DATA_DIR = mkdtempSync(path.join(tmpdir(), 'splendor-regression-'));
 
 const serverLog = [];
 let server;
@@ -22,13 +27,14 @@ try {
     checks: [
       'healthz',
       'dashboard-shell',
-      'room-http-flow',
+      'room-http-flow (seat tokens, host-only, hidden reserve)',
       'buy-then-evolve-domain-regression',
     ],
     baseUrl: BASE_URL,
   }, null, 2));
 } finally {
   await stopServer();
+  rmSync(DATA_DIR, { recursive: true, force: true });
 }
 
 function startServer() {
@@ -38,6 +44,7 @@ function startServer() {
       ...process.env,
       SPLENDOR_HTTP_HOST: HOST,
       SPLENDOR_HTTP_PORT: String(PORT),
+      SPLENDOR_DB_PATH: path.join(DATA_DIR, 'rooms.db'),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -104,28 +111,43 @@ async function assertRoomHttpFlow() {
     method: 'POST',
     body: { playerName: 'Workflow B' },
   });
-  const started = await request(`/v1/rooms/${created.room.roomId}/start`, {
-    method: 'POST',
-    body: { playerId: created.playerId },
-  });
+  const roomPath = `/v1/rooms/${created.room.roomId}`;
+  await expectStatus(`${roomPath}/start`, { method: 'POST' }, 401);
+  await expectStatus(`${roomPath}/start`, { method: 'POST', token: joined.seatToken }, 403);
+  const started = await request(`${roomPath}/start`, { method: 'POST', token: created.seatToken });
   assert(started.status === 'playing', `Expected playing room, got ${started.status}`);
   assert(started.board.market[1].length === 4, 'Tier-1 market was not filled.');
   assert(started.board.specialMarket.rare.length === 1, 'Rare special market was not filled.');
+  assert(started.board.deckCounts !== undefined && started.board.decks === undefined, 'Deck contents leaked into the room view.');
 
-  const legal = await request(`/v1/rooms/${created.room.roomId}/players/${created.playerId}/legal-actions`);
+  const legal = await request(`${roomPath}/legal-actions`, { token: created.seatToken });
   const take = legal.actions.find((entry) => entry.action.kind === 'take_tokens' && entry.action.tokens.length === 3);
   assert(take !== undefined, 'Expected at least one legal 3-token take action.');
 
-  const afterAction = await request(`/v1/rooms/${created.room.roomId}/actions/take-tokens`, {
+  const takeBody = {
+    tokens: take.action.tokens,
+    ...(take.action.discardTokens === undefined ? {} : { discardTokens: take.action.discardTokens }),
+    ...(take.action.evolution === undefined ? {} : { evolution: take.action.evolution }),
+  };
+  // Seat B may not act for seat A: the acting player comes from the token, and it is not B's turn.
+  await expectStatus(`${roomPath}/actions/take-tokens`, { method: 'POST', token: joined.seatToken, body: takeBody }, 409);
+  const afterAction = await request(`${roomPath}/actions/take-tokens`, {
     method: 'POST',
-    body: {
-      playerId: created.playerId,
-      tokens: take.action.tokens,
-      ...(take.action.discardTokens === undefined ? {} : { discardTokens: take.action.discardTokens }),
-      ...(take.action.evolution === undefined ? {} : { evolution: take.action.evolution }),
-    },
+    token: created.seatToken,
+    body: { ...takeBody, clientActionId: 'regression-take-1' },
   });
   assert(afterAction.currentPlayerId === joined.playerId, 'Turn did not advance to the joined player.');
+
+  const reserved = await request(`${roomPath}/actions/reserve`, {
+    method: 'POST',
+    token: joined.seatToken,
+    body: { source: { kind: 'deck', tier: 1 } },
+  });
+  const hostView = await request(roomPath, { token: created.seatToken });
+  const hiddenForHost = hostView.players.find((entry) => entry.id === joined.playerId).reserved[0];
+  assert(hiddenForHost?.hidden === true, 'Blind reserve must stay hidden from other seats.');
+  const ownView = reserved.players.find((entry) => entry.id === joined.playerId).reserved[0];
+  assert(ownView?.hidden !== true && typeof ownView?.name === 'string', 'Blind reserve must be visible to its owner.');
 }
 
 function assertBuyThenEvolveDomainRegression() {
@@ -167,15 +189,30 @@ function assertBuyThenEvolveDomainRegression() {
 }
 
 async function request(path, options = {}) {
+  const { response, text } = await send(path, options);
+  assert(response.ok, `${options.method ?? 'GET'} ${path} returned ${response.status}: ${text}`);
+  return text === '' ? null : JSON.parse(text);
+}
+
+async function expectStatus(path, options, status) {
+  const { response, text } = await send(path, options);
+  assert(response.status === status, `${options.method ?? 'GET'} ${path} returned ${response.status}, expected ${status}: ${text}`);
+}
+
+async function send(path, options = {}) {
+  const headers = {};
+  if (options.body !== undefined) {
+    headers['content-type'] = 'application/json';
+  }
+  if (options.token !== undefined) {
+    headers.authorization = `Bearer ${options.token}`;
+  }
   const response = await fetch(`${BASE_URL}${path}`, {
     method: options.method ?? 'GET',
-    headers: options.body === undefined ? undefined : { 'content-type': 'application/json' },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    headers,
+    ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
   });
-  const text = await response.text();
-  const payload = text === '' ? null : JSON.parse(text);
-  assert(response.ok, `${options.method ?? 'GET'} ${path} returned ${response.status}: ${text}`);
-  return payload;
+  return { response, text: await response.text() };
 }
 
 function testCard(id, tier, name, element, points, cost, extras = {}) {

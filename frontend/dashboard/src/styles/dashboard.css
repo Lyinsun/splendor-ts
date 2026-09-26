@@ -506,7 +506,7 @@ label {
   left: 0;
   bottom: calc(100% + 8px);
   z-index: 30;
-  width: 236px;
+  width: 300px;
   pointer-events: none;
   opacity: 0;
   transform: translateY(4px);
@@ -520,6 +520,8 @@ label {
 }
 
 .public-card-preview {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 8px;
   background: #171c22;
@@ -528,15 +530,17 @@ label {
 }
 
 .public-card-preview-art {
-  height: 138px;
+  min-height: 96px;
   display: grid;
   place-items: center;
   background: #10151b;
 }
 
+/* Card art is a full portrait card face; keep it beside the text so the whole card fits in narrow columns. */
 .public-card-preview-art img {
   width: 100%;
-  height: 100%;
+  height: auto;
+  aspect-ratio: 420 / 648;
   object-fit: contain;
   display: block;
 }
@@ -555,6 +559,7 @@ label {
 .public-card-preview-body {
   padding: 10px;
   display: grid;
+  align-content: start;
   gap: 6px;
 }
 

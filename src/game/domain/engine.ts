@@ -384,6 +384,10 @@ function takeTokens(state: GameState, player: PlayerState, tokens: TokenKind[], 
 }
 
 function reserveCard(state: GameState, player: PlayerState, source: Extract<CardSource, { kind: 'market' | 'deck' }>, now: string): void {
+  // The type narrows to market/deck, but actions can arrive untyped (tests, persisted states, future transports).
+  if (source.kind !== 'market' && source.kind !== 'deck') {
+    throw new GameRuleError('Rare and legendary Pokémon cannot be reserved.', 'cannot_reserve_special');
+  }
   if (player.reserved.length >= MAX_RESERVED_CARDS) {
     throw new GameRuleError('A player can reserve at most three cards.', 'reserve_limit');
   }

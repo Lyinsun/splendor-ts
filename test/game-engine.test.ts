@@ -3,7 +3,7 @@ import { normalizePublicBasePath } from '../src/config/config.js';
 import { COMPANION_CARDS, GYM_LEADERS } from '../src/game/domain/content.js';
 import { abandonGame, addPlayerToLobby, applyGameAction, createLobbyState, leaveFinishedGame, returnToLobby, skipTurn, startGame } from '../src/game/domain/engine.js';
 import { listLegalGameActions } from '../src/game/domain/legal-actions.js';
-import { GameRuleError, type CompanionCard, type Element } from '../src/game/domain/types.js';
+import { GameRuleError, type CompanionCard, type Element, type GameAction } from '../src/game/domain/types.js';
 import { createElementCounter, emptyTokenBank } from '../src/game/domain/tokens.js';
 
 describe('config', () => {
@@ -127,23 +127,40 @@ describe('game engine', () => {
     expect(next.currentPlayerId).toBe('p2');
   });
 
-  it('follows the official sparse-bank rule: one of each remaining element, never a padded pair', () => {
+  it('follows the Pokémon rulebook sparse-bank rule: with two elements left, one of each or two of one', () => {
     const game = startedGame();
     game.board.bank = { fire: 1, water: 2, grass: 0, electric: 0, psychic: 0, prism: 5 };
 
-    expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'fire', 'water'] })).toThrow(GameRuleError);
-    expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['water', 'water', 'fire'] })).toThrow(GameRuleError);
+    // Only one fire remains, so fire cannot be the doubled element; a lone token is too few while two kinds remain.
+    expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'fire', 'water'] })).toThrow(/Not enough fire/);
     expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['water'] })).toThrow(GameRuleError);
+    expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['water', 'water'] })).toThrow(/at least 4/);
 
-    const next = applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['water', 'fire'] });
-    const player = next.players.find((entry) => entry.id === 'p1');
+    const doubled = applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['water', 'water', 'fire'] });
+    const doubledPlayer = doubled.players.find((entry) => entry.id === 'p1');
+    expect(doubledPlayer?.tokens.water).toBe(2);
+    expect(doubledPlayer?.tokens.fire).toBe(1);
+    expect(doubled.board.bank.water).toBe(0);
+    expect(doubled.board.bank.fire).toBe(0);
 
-    expect(player?.tokens.water).toBe(1);
-    expect(player?.tokens.fire).toBe(1);
-    expect(next.board.bank.water).toBe(1);
-    expect(next.board.bank.fire).toBe(0);
+    const single = applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['water', 'fire'] });
+    expect(single.board.bank.water).toBe(1);
+    expect(single.board.bank.fire).toBe(0);
+
     expect(listLegalGameActions(game, 'p1').actions.filter((option) => option.kind === 'take_tokens').map((option) => option.action))
-      .toEqual([{ kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'water'] }]);
+      .toEqual([
+        { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'water'] },
+        { kind: 'take_tokens', playerId: 'p1', tokens: ['water', 'water', 'fire'] },
+      ]);
+  });
+
+  it('refuses to reserve rare or legendary cards with a rule error', () => {
+    const game = startedGame();
+    const rare = game.board.specialMarket.rare[0];
+    expect(rare).toBeDefined();
+    const action = { kind: 'reserve_card', playerId: 'p1', source: { kind: 'special_market', rank: 'rare', cardId: rare?.id ?? '' } } as unknown as GameAction;
+
+    expect(() => applyGameAction(game, action)).toThrow(/cannot be reserved/);
   });
 
   it('requires three different elements while three or more remain, and a stack of four for a pair', () => {

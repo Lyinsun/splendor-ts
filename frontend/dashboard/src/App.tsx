@@ -1063,13 +1063,15 @@ function describeTokenTakeSelectionProblem(
   const entries = TOKEN_KIND_ORDER
     .map((token) => [token, selectionCounts[token]] as const)
     .filter(([, count]) => count > 0);
-  // Mirrors src/game/domain/token-rules.ts: three different elements, or one of each when fewer than three remain.
+  // Mirrors src/game/domain/token-rules.ts: three different elements, or one of each when fewer than three remain;
+  // with exactly two left, one of them may be taken twice.
   const availableElementKinds = ELEMENTS.filter((element) => room.board.bank[element] > 0).length;
   const isDistinctTake = tokenSelection.length === Math.min(3, availableElementKinds)
     && entries.length === tokenSelection.length;
+  const isSparseDoubleTake = tokenSelection.length === 3 && entries.length === 2 && availableElementKinds === 2;
   const isPair = tokenSelection.length === 2 && entries.length === 1 && entries[0]?.[1] === 2;
 
-  if (!isDistinctTake && !isPair) {
+  if (!isDistinctTake && !isSparseDoubleTake && !isPair) {
     return copy.tokenTakeProblems.invalidPattern;
   }
   if (isPair) {

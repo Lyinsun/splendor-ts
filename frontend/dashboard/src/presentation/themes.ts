@@ -307,7 +307,7 @@ export const APP_COPY = {
         },
         {
           title: '第 2 步：开始游戏',
-          body: '房主可以点击「添加本地玩家」加入 AI 对手，或邀请朋友在另一个浏览器窗口加入房间。至少 2 位玩家后，点击「开始」进入游戏。',
+          body: '房主可以点击「添加本地玩家」在同一个浏览器里多开一个席位（热座轮流操作，不是 AI），或把房间号 / 席位链接发给朋友，在他们自己的浏览器里加入。至少 2 位玩家后，点击「开始」进入游戏。',
         },
         {
           title: '第 3 步：进行回合',
@@ -518,7 +518,7 @@ export const APP_COPY = {
         },
         {
           title: 'Step 2: Start the game',
-          body: 'The host can click "Add local player" to add an AI opponent, or invite a friend to join from another browser window. With at least 2 players, click "Start" to begin.',
+          body: 'The host can click "Add local player" to add another seat in this same browser (hotseat play, not an AI), or share the room ID / seat link so friends can join from their own browser. With at least 2 players, click "Start" to begin.',
         },
         {
           title: 'Step 3: Take your turn',

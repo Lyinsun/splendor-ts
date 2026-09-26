@@ -1,0 +1,1215 @@
+/*
+ * In-match table: one screen, no page scroll on desktop.
+ *   turn bar
+ *   [ ball supply | market (3 tiers) | leaders / specials / log | opponents ]
+ *   my dock: seat + rack · action tray · reserved hand
+ */
+
+.app.in-match {
+  width: calc(100vw - 20px);
+  max-width: 1720px;
+  padding: 8px 0 10px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app.in-match .topbar {
+  min-height: 44px;
+  padding: 4px 12px;
+  box-shadow: none;
+}
+
+.app.in-match .brand h1 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.app.in-match .brand span,
+.app.in-match .brand-mark,
+.app.in-match .presentation-controls .select-control span {
+  display: none;
+}
+
+.app.in-match .topbar .icon-button,
+.app.in-match .topbar select {
+  min-height: 32px;
+}
+
+.app.in-match .error-banner,
+.app.in-match .reconnect-banner {
+  margin: 0;
+}
+
+.match-layout {
+  --match-surface: rgba(30, 35, 42, 0.92);
+  --match-line: rgba(255, 255, 255, 0.1);
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 272px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "turn turn"
+    "center opponents"
+    "dock dock";
+  gap: 8px;
+}
+
+.match-layout h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The global .token-* classes paint solid tiles; in the match they only tint. */
+.match-layout .ball-stack[class*="token-"],
+.match-layout .tray-slot[class*="token-"],
+.match-layout .rack-slot[class*="token-"] {
+  background: transparent;
+  color: inherit;
+}
+
+/* ---------- Turn bar ---------- */
+.turn-bar {
+  grid-area: turn;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--match-line);
+  background: var(--match-surface);
+}
+
+.turn-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.turn-status strong {
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.turn-meta {
+  color: var(--text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.turn-light {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #6b7280;
+  flex: none;
+}
+
+.turn-bar.is-my-turn {
+  border-color: var(--active-border);
+  background: linear-gradient(90deg, rgba(246, 212, 73, 0.16), var(--match-surface) 45%);
+}
+
+.turn-bar.is-my-turn strong {
+  color: var(--accent);
+}
+
+.turn-bar.is-my-turn .turn-light {
+  background: var(--accent);
+  animation: turn-pulse 1.6s ease-in-out infinite;
+}
+
+.turn-bar.is-finished .turn-light {
+  background: #4ade80;
+}
+
+.final-flag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.turn-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.turn-tools button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.seat-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.seat-switch select {
+  min-height: 30px;
+  width: auto;
+}
+
+@keyframes turn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(246, 212, 73, 0.7); }
+  50% { box-shadow: 0 0 0 7px rgba(246, 212, 73, 0); }
+}
+
+/* ---------- Opponents ---------- */
+.opponent-row {
+  grid-area: opponents;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opponent-strip {
+  border-radius: 8px;
+  border: 1px solid var(--match-line);
+  background: var(--match-surface);
+  padding: 8px 10px;
+  display: grid;
+  gap: 6px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.opponent-strip.is-active {
+  border-color: var(--active-border);
+  box-shadow: 0 0 0 1px var(--active-border), 0 0 18px rgba(246, 212, 73, 0.18);
+}
+
+.opponent-strip.is-left {
+  opacity: 0.5;
+}
+
+.opponent-strip.is-winner {
+  border-color: #4ade80;
+}
+
+.opponent-strip header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.opponent-strip header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opponent-strip header em {
+  flex: none;
+  white-space: nowrap;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.strip-score {
+  margin-left: auto;
+  font-weight: 900;
+  color: #f1d28c;
+  white-space: nowrap;
+}
+
+.strip-balls {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.strip-ball {
+  display: grid;
+  justify-items: center;
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.strip-ball b {
+  font-weight: 900;
+}
+
+.strip-ball i {
+  font-style: normal;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.strip-ball.is-zero {
+  opacity: 0.35;
+}
+
+.opponent-strip footer {
+  display: grid;
+  gap: 4px;
+}
+
+.opponent-strip footer:empty {
+  display: none;
+}
+
+.match-layout .public-card-strip {
+  gap: 4px;
+}
+
+.match-layout .public-card-chip {
+  min-width: 30px;
+  min-height: 26px;
+  font-size: 11px;
+}
+
+/* Hidden previews still count toward a scroll container's overflow, so only render on hover. */
+.match-layout .public-card-popover {
+  display: none;
+}
+
+.match-layout .public-card-chip:hover .public-card-popover,
+.match-layout .public-card-chip:focus-visible .public-card-popover {
+  display: block;
+}
+
+/* The opponent column is narrow and scrolls: open previews full-width under the strip. */
+.opponent-strip {
+  position: relative;
+}
+
+.opponent-row .public-card-chip {
+  position: static;
+}
+
+.opponent-row .public-card-popover {
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  bottom: auto;
+  width: auto;
+}
+
+/* ---------- Center ---------- */
+.match-center {
+  grid-area: center;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) 244px;
+  gap: 8px;
+}
+
+/* Ball supply: a vertical column of stacks. */
+.ball-supply {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--match-line);
+  background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.07), transparent 70%), var(--match-surface);
+}
+
+.ball-stack {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 2px 4px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0;
+  cursor: pointer;
+  transition: opacity 0.18s ease, filter 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.match-layout.can-act .ball-stack:not(.is-blocked):not(.is-static):hover {
+  border-color: var(--accent-border);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.ball-stack.is-blocked {
+  opacity: 0.34;
+  filter: grayscale(0.7);
+  cursor: not-allowed;
+}
+
+.ball-stack.is-picked {
+  border-color: rgba(246, 212, 73, 0.45);
+}
+
+.ball-stack.is-static {
+  cursor: default;
+}
+
+.ball-pile {
+  position: relative;
+  width: 44px;
+  height: 44px;
+}
+
+.ball-pile .poke-ball {
+  position: absolute;
+  left: 5px;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+}
+
+.ball-pile .pile-0 { top: 10px; }
+.ball-pile .pile-1 { top: 7px; }
+.ball-pile .pile-2 { top: 4px; }
+.ball-pile .pile-3 { top: 1px; }
+
+.ball-pile.is-empty .poke-ball {
+  opacity: 0.18;
+  filter: grayscale(1);
+}
+
+.stack-count {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+  background: #111419;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.stack-name {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.stack-key {
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  font: 700 10px/1 ui-monospace, monospace;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.match-layout:not(.can-act) .stack-key {
+  display: none;
+}
+
+/* Market: three tiers, each row sized by height; cards keep the printed aspect ratio. */
+.market-board {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--match-line);
+  background: radial-gradient(ellipse at 50% 40%, rgba(58, 96, 72, 0.35), transparent 75%), rgba(24, 30, 34, 0.94);
+}
+
+.market-row {
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+}
+
+.deck-back,
+.market-row .companion-card,
+.market-slot {
+  height: 100%;
+  aspect-ratio: 420 / 648;
+  width: auto;
+  min-height: 0;
+  flex: none;
+}
+
+.deck-back {
+  border-radius: 8px;
+  padding: 10px 6px;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  justify-items: center;
+  gap: 2px;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.95) 0 9%, #15171c 9% 12%, transparent 12%),
+    linear-gradient(180deg, #d9434a 0 48%, #15171c 48% 52%, #eef0f2 52%);
+  color: #fff;
+  white-space: normal;
+}
+
+.deck-back.tier-2 {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.95) 0 9%, #15171c 9% 12%, transparent 12%),
+    linear-gradient(180deg, #2f6fd6 0 48%, #15171c 48% 52%, #eef0f2 52%);
+}
+
+.deck-back.tier-3 {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.95) 0 9%, #15171c 9% 12%, transparent 12%),
+    linear-gradient(180deg, #26282e 0 48%, #15171c 48% 52%, #eef0f2 52%);
+}
+
+.deck-back > * {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.deck-back .deck-tier {
+  color: #f6d449;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.deck-back strong {
+  grid-row: 3;
+  font-size: 22px;
+  color: #15171c;
+  text-shadow: none;
+}
+
+.deck-back small {
+  grid-row: 4;
+  font-size: 11px;
+  color: #15171c;
+  text-shadow: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.deck-back:not(:disabled):hover {
+  border-color: var(--accent-border);
+}
+
+.deck-back:not(:disabled):hover small {
+  opacity: 1;
+}
+
+/* Cards inside the match: the art is the card, actions float over it. */
+.match-layout .companion-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.match-layout .companion-card .card-art {
+  flex: 1;
+  min-height: 0;
+}
+
+.match-layout .card-face-card .card-face-art {
+  aspect-ratio: auto;
+  height: 100%;
+}
+
+.match-layout .card-face-card .card-body {
+  display: none;
+}
+
+/* Card faces already print their type icon; the dot would cover the evolution line. */
+.match-layout .card-face-card .card-element-indicator {
+  display: none;
+}
+
+.match-layout .companion-card:not(.card-face-card) .card-body {
+  padding: 4px 6px;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.match-layout .companion-card:not(.card-face-card) .card-flavor,
+.match-layout .companion-card:not(.card-face-card) .card-body small {
+  display: none;
+}
+
+.match-layout .companion-card .card-actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 18px 5px 5px;
+  border-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: linear-gradient(180deg, transparent, rgba(8, 10, 14, 0.9) 40%);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 3;
+}
+
+.match-layout .companion-card:hover .card-actions,
+.match-layout .companion-card:focus-within .card-actions {
+  opacity: 1;
+  transform: none;
+}
+
+.match-layout .companion-card .card-actions button {
+  min-height: 26px;
+  width: 100%;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.match-layout .companion-card .card-actions button:first-child:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: transparent;
+}
+
+.match-layout .companion-card.affordable {
+  border-color: rgba(246, 212, 73, 0.75);
+  box-shadow: 0 0 0 1px rgba(246, 212, 73, 0.5), 0 0 14px rgba(246, 212, 73, 0.28);
+}
+
+.match-layout .companion-card.affordable:hover {
+  border-color: var(--accent);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4), 0 0 18px rgba(246, 212, 73, 0.4);
+}
+
+.match-layout .companion-card.unaffordable {
+  opacity: 0.86;
+}
+
+.match-layout .companion-card:hover {
+  transform: translateY(-2px);
+  z-index: 4;
+}
+
+@media (hover: none) {
+  .match-layout .companion-card .card-actions {
+    opacity: 1;
+    transform: none;
+    padding-top: 6px;
+    flex-direction: row;
+  }
+}
+
+/* Right side of the center: specials, leaders, log. */
+.match-side {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.side-block {
+  border-radius: 8px;
+  border: 1px solid var(--match-line);
+  background: var(--match-surface);
+  padding: 8px;
+  min-height: 0;
+}
+
+.special-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.special-slot {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+
+.special-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.special-slot .companion-card {
+  width: 100%;
+  max-width: 108px;
+  aspect-ratio: 420 / 648;
+  min-height: 0;
+}
+
+.leader-list {
+  display: grid;
+  gap: 4px;
+}
+
+.leader-empty {
+  margin: 0;
+  color: rgba(245, 247, 251, 0.6);
+  font-size: 12px;
+}
+
+.market-slot {
+  aspect-ratio: 420 / 648;
+  width: auto;
+  min-height: 0;
+  flex: none;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.leader-chip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "name points" "cost cost";
+  gap: 2px 6px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.leader-chip strong {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leader-points {
+  grid-area: points;
+  font-weight: 900;
+}
+
+.leader-chip .cost-list {
+  grid-area: cost;
+}
+
+.match-layout .cost-chip {
+  min-width: 18px;
+  height: 18px;
+  font-size: 11px;
+}
+
+.log-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.match-log {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+.match-log p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(245, 247, 251, 0.72);
+}
+
+.match-log p span {
+  display: inline-block;
+  min-width: 22px;
+  margin-right: 4px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.match-log p.is-latest {
+  color: #fff;
+  animation: log-in 0.5s ease-out;
+}
+
+@keyframes log-in {
+  from { background: rgba(246, 212, 73, 0.25); }
+  to { background: transparent; }
+}
+
+/* ---------- My dock ---------- */
+.my-dock {
+  grid-area: dock;
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) minmax(360px, 440px) minmax(220px, 1fr);
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--match-line);
+  background: var(--match-surface);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.my-dock.is-my-turn {
+  border-color: var(--active-border);
+  box-shadow: 0 0 0 1px var(--active-border), 0 -6px 24px rgba(246, 212, 73, 0.12);
+}
+
+.my-dock.is-spectator {
+  display: block;
+  color: var(--text-muted);
+}
+
+.my-seat {
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  min-width: 0;
+}
+
+.seat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.seat-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #f1d28c;
+  font-weight: 900;
+}
+
+.seat-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.seat-progress span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.ball-rack {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.rack-slot {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+}
+
+.rack-ball {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
+.rack-ball b {
+  position: absolute;
+  right: -6px;
+  bottom: -3px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+  background: #111419;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.rack-slot.is-zero .poke-ball {
+  opacity: 0.3;
+}
+
+.rack-bonus {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-muted);
+  min-height: 14px;
+}
+
+.rack-total {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  align-self: center;
+}
+
+/* Action tray */
+.action-tray {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+}
+
+.action-tray.is-idle {
+  opacity: 0.6;
+}
+
+.tray-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.tray-head span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.tray-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tray-slots {
+  display: flex;
+  gap: 8px;
+}
+
+.tray-slot {
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tray-slot.is-empty {
+  border-style: dashed;
+  background: transparent;
+}
+
+button.tray-slot:hover {
+  border-color: #fca5a5;
+}
+
+.tray-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.tray-actions button {
+  min-height: 36px;
+}
+
+.confirm-button:not(:disabled) {
+  box-shadow: 0 0 14px rgba(246, 212, 73, 0.4);
+}
+
+.tray-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.tray-message {
+  flex: 1;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.tray-message.is-hint {
+  color: var(--text-muted);
+}
+
+.tray-message.is-problem {
+  color: #fca5a5;
+}
+
+.tray-foot button {
+  min-height: 28px;
+  font-size: 12px;
+}
+
+.tray-evolution {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.tray-evolution select {
+  min-height: 28px;
+  width: auto;
+  max-width: 150px;
+}
+
+.tray-discard {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #3a1d22;
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  font-size: 12px;
+}
+
+/* An over-10 take floats above the tray so the one-screen layout does not reflow. */
+.tray-discard.is-floating {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.5);
+}
+
+.discard-options,
+.discard-chosen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.discard-ball {
+  min-height: 30px;
+  padding: 0 6px;
+  gap: 3px;
+}
+
+.discard-ball small {
+  font-size: 11px;
+}
+
+/* Reserved hand */
+.my-hand {
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  min-width: 0;
+}
+
+.hand-cards {
+  display: flex;
+  gap: 6px;
+  min-height: 0;
+}
+
+.hand-cards .companion-card {
+  width: auto;
+  height: 118px;
+  aspect-ratio: 420 / 648;
+  min-height: 0;
+  flex: none;
+}
+
+.hand-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---------- Waiting room ---------- */
+.waiting-room {
+  display: grid;
+  justify-items: center;
+  margin-top: 16px;
+}
+
+.waiting-panel {
+  width: min(560px, 100%);
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+/* ---------- Flights and feedback ---------- */
+.flying-ball {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.45));
+  will-change: transform;
+}
+
+/* ---------- Narrower screens ---------- */
+@media (max-width: 1280px) {
+  .match-layout {
+    grid-template-columns: minmax(0, 1fr) 232px;
+  }
+
+  .match-center {
+    grid-template-columns: 92px minmax(0, 1fr) 208px;
+  }
+
+  .my-dock {
+    grid-template-columns: minmax(0, 1fr) minmax(330px, 400px) minmax(0, 0.8fr);
+  }
+}
+
+@media (max-width: 1024px), (max-height: 700px) {
+  .app.in-match {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .match-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "turn"
+      "opponents"
+      "center"
+      "dock";
+  }
+
+  .opponent-row {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .opponent-strip {
+    min-width: 230px;
+  }
+
+  .match-center {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .match-side {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+
+  .market-board {
+    grid-template-rows: none;
+  }
+
+  .market-row {
+    height: 190px;
+  }
+
+  .my-dock {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    grid-template-columns: minmax(0, 1fr);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .my-dock .my-hand {
+    order: 3;
+  }
+
+  .tray-discard.is-floating {
+    position: static;
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .turn-bar {
+    flex-wrap: wrap;
+  }
+
+  .turn-tools button {
+    font-size: 0;
+    gap: 0;
+  }
+
+  .match-center {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ball-supply {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .ball-stack {
+    min-width: 56px;
+  }
+
+  .stack-name {
+    display: none;
+  }
+
+  .market-board {
+    padding: 6px;
+  }
+
+  .market-row {
+    height: auto;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  .deck-back,
+  .market-row .companion-card {
+    height: auto;
+    width: 92px;
+  }
+
+  .market-slot {
+    display: none;
+  }
+
+  .my-seat .public-card-strip {
+    display: none;
+  }
+
+  .tray-slot {
+    width: 40px;
+    height: 40px;
+  }
+
+  .my-dock {
+    gap: 6px;
+    padding: 6px 8px;
+    background: #1e232a;
+    max-height: 52vh;
+    overflow-y: auto;
+  }
+
+  .my-dock .my-hand.is-empty,
+  .action-tray .tray-head span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turn-bar.is-my-turn .turn-light,
+  .match-log p.is-latest {
+    animation: none;
+  }
+
+  .match-layout .companion-card,
+  .match-layout .companion-card .card-actions {
+    transition: none;
+  }
+}

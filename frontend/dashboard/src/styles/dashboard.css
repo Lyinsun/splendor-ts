@@ -1853,7 +1853,8 @@ button:not(:disabled):active {
 }
 
 /* --- Card element type indicator --- */
-.card-element-indicator {
+/* `.card-art .card-element-indicator` outranks `.card-art span` (the fallback initial). */
+.card-art .card-element-indicator {
   position: absolute;
   top: 8px;
   left: 8px;

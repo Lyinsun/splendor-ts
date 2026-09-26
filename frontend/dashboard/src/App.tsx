@@ -1,25 +1,22 @@
-import { ChevronDown, CircleHelp, Copy, Gem, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users, X } from 'lucide-react';
-import { type CSSProperties, useEffect, useState } from 'react';
-import { isHiddenCard, visibleCards, type ActionOptions, type CardSource, type CardTier, type CompanionCard, type ElementCost, type EvolutionSelection, type GameState, type PlayerState, type ReservedCard, type SpecialCardRank, type TokenKind } from './api/types';
-import { ELEMENTS } from './api/types';
-import { useGameRoom, type GameRoomError } from './hooks/useGameRoom';
+import { CircleHelp, Copy, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users, X, Zap, ZapOff } from 'lucide-react';
+import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import type { CardSource, EvolutionSelection, GameState, PlayerState, TokenKind } from './api/types';
+import { MatchTable } from './components/MatchTable';
+import { PlayerPanel, StatusPill } from './components/tableViews';
+import { motionPreferred, setMotionPreferred, useBallFlights, type FlightOrigin } from './hooks/useBallFlights';
+import { useGameRoom } from './hooks/useGameRoom';
 import { HelpModal, hasSeenTutorial, type HelpTab } from './HelpModal';
+import { buildActionOptions, type AppCopy, type GameActionKind } from './presentation/gameRules';
+import { MATCH_COPY } from './presentation/matchCopy';
 import { publicUrl } from './runtime/publicPath';
 import {
   APP_COPY,
   LOCALE_OPTIONS,
   THEME_OPTIONS,
   THEMES,
-  cardArt,
-  cardFlavor,
   browserDefaultLocale,
-  cardText,
-  formatLogMessage,
-  leaderName,
   normalizeLocale,
   normalizeThemeId,
-  tokenClassName,
-  tokenLabel,
   type Locale,
   type ThemeId,
 } from './presentation/themes';
@@ -31,22 +28,14 @@ const safeStorage = {
   get(key: string): string | null { try { return localStorage.getItem(key); } catch { return null; } },
   set(key: string, value: string): void { try { localStorage.setItem(key, value); } catch { /* ignore */ } },
 };
-const TOKEN_KIND_ORDER = ['fire', 'water', 'grass', 'electric', 'psychic', 'prism'] satisfies TokenKind[];
-const EVOLUTION_TIERS = [2, 3] satisfies CardTier[];
 
-type AppCopy = (typeof APP_COPY)[Locale];
 type ActionContext = 'take_tokens' | null;
-type GameActionKind = 'take_tokens' | 'reserve_card' | 'buy_card';
-interface EvolutionCandidate {
-  selection: EvolutionSelection;
-  label: string;
-}
-
 export function App() {
   const game = useGameRoom();
   const [locale, setLocaleState] = useState<Locale>(() => normalizeLocale(safeStorage.get(LOCALE_KEY), browserDefaultLocale()));
   const [themeId, setThemeIdState] = useState<ThemeId>(() => normalizeThemeId(safeStorage.get(THEME_KEY)));
   const copy = APP_COPY[locale];
+  const match = MATCH_COPY[locale];
   const theme = THEMES[themeId];
   const [draftName, setDraftName] = useState(game.playerName);
   const [roomName, setRoomName] = useState(theme.defaultRoomName[locale]);
@@ -57,6 +46,7 @@ export function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpInitialTab, setHelpInitialTab] = useState<HelpTab>('quickStart');
   const [errorDismissed, setErrorDismissed] = useState(false);
+  const [motionOn, setMotionOn] = useState(motionPreferred);
 
   useEffect(() => {
     if (!hasSeenTutorial()) {
@@ -67,7 +57,9 @@ export function App() {
 
   const room = game.room;
   const myPlayer = game.currentPlayer;
+  const inMatch = room !== null && room.status !== 'lobby';
   const appStyle = { '--hero-image': `url("${publicUrl(theme.assets.hero.src)}")` } as CSSProperties;
+  const { primeOrigins } = useBallFlights(room);
 
   // Reset dismiss when a new error arrives.
   useEffect(() => {
@@ -75,6 +67,15 @@ export function App() {
       setErrorDismissed(false);
     }
   }, [game.error]);
+
+  // A draft from an earlier turn (or another seat) must not leak into the next one.
+  const turnKey = room === null ? '' : `${room.roomId}:${room.currentPlayerId ?? ''}:${game.playerId}`;
+  useEffect(() => {
+    setTokenSelection([]);
+    setDiscardSelection([]);
+    setEvolutionSelection(null);
+    setLastActionContext(null);
+  }, [turnKey]);
 
   const handleLocaleChange = (nextLocale: Locale) => {
     setLocaleState(nextLocale);
@@ -93,20 +94,28 @@ export function App() {
     }
   };
 
-  const actionOptions = (actionKind: GameActionKind, source?: Exclude<CardSource, { kind: 'deck' }>): ActionOptions =>
+  const toggleMotion = () => {
+    setMotionPreferred(!motionOn);
+    setMotionOn(!motionOn);
+  };
+
+  const actionOptions = (actionKind: GameActionKind, source?: Exclude<CardSource, { kind: 'deck' }>) =>
     buildActionOptions(actionKind, room, myPlayer, discardSelection, evolutionSelection, source);
   const clearSettlementDraft = () => {
     setDiscardSelection([]);
     setEvolutionSelection(null);
   };
 
-  const handleTakeTokens = async () => {
+  const handleTakeTokens = async (origins: FlightOrigin[]) => {
     setLastActionContext('take_tokens');
+    primeOrigins(origins);
     const next = await game.takeTokens(tokenSelection, actionOptions('take_tokens'));
     if (next !== null) {
       setTokenSelection([]);
       clearSettlementDraft();
       setLastActionContext(null);
+    } else {
+      primeOrigins([]);
     }
   };
 
@@ -114,6 +123,7 @@ export function App() {
     setLastActionContext(null);
     const next = await game.reserveCard(source, actionOptions('reserve_card', source.kind === 'market' ? source : undefined));
     if (next !== null) {
+      setTokenSelection([]);
       clearSettlementDraft();
     }
   };
@@ -122,12 +132,27 @@ export function App() {
     setLastActionContext(null);
     const next = await game.buyCard(source, actionOptions('buy_card', source));
     if (next !== null) {
+      setTokenSelection([]);
       clearSettlementDraft();
     }
   };
 
+  const onTokenSelectionChange = useCallback((next: TokenKind[]) => {
+    setLastActionContext(null);
+    setTokenSelection(next);
+  }, []);
+  const onDiscardSelectionChange = useCallback((next: TokenKind[]) => {
+    setLastActionContext(null);
+    setDiscardSelection(next);
+  }, []);
+
+  const onLeave = () => {
+    if (room?.status === 'playing' && !window.confirm(copy.confirmLeavePlaying)) return;
+    void game.leaveRoom();
+  };
+
   return (
-    <main className={`app ${theme.className}`} style={appStyle}>
+    <main className={`app ${theme.className}${inMatch ? ' in-match' : ''}`} style={appStyle}>
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark"><Sparkles size={20} /></div>
@@ -145,12 +170,17 @@ export function App() {
             onThemeChange={handleThemeChange}
           />
           <StatusPill label={game.connected ? copy.liveSync : copy.offlineSync} tone={game.connected ? 'good' : 'muted'} />
+          <button className="icon-button" type="button" onClick={toggleMotion} title={motionOn ? match.motionOn : match.motionOff} aria-pressed={motionOn}>
+            {motionOn ? <Zap size={18} /> : <ZapOff size={18} />}
+          </button>
           <button className="icon-button" type="button" onClick={() => { setHelpInitialTab('quickStart'); setHelpOpen(true); }} title={copy.help}>
             <CircleHelp size={18} />
           </button>
-          <button className="icon-button" type="button" onClick={() => void game.refreshRooms()} disabled={game.busy} title={copy.refreshRooms}>
-            <RefreshCw size={18} />
-          </button>
+          {inMatch ? null : (
+            <button className="icon-button" type="button" onClick={() => void game.refreshRooms()} disabled={game.busy} title={copy.refreshRooms}>
+              <RefreshCw size={18} />
+            </button>
+          )}
         </div>
       </header>
 
@@ -170,18 +200,19 @@ export function App() {
         </div>
       )}
 
-      <section className={`hero-panel ${room === null ? 'lobby-hero' : 'match-panel'}`} aria-label={theme.assets.hero.alt[locale]}>
-        <div className="hero-copy">
-          <p className="eyebrow">{copy.heroEyebrow}</p>
-          <h2>{room?.roomName ?? copy.noRoomTitle}</h2>
-          <p>{room === null ? copy.noRoomDescription : copy.roomMeta(room.players.length, room.round, room.turn)}</p>
-        </div>
-        <div className="hero-meta">
-          <StatusPill label={theme.label[locale]} tone="muted" />
-          <StatusPill label={room === null ? copy.noRoomStatus : copy.roomStatus[room.status]} tone={room?.status === 'playing' ? 'good' : 'muted'} />
-          {room?.endGameTriggeredBy !== null && room?.endGameTriggeredBy !== undefined ? <StatusPill label={copy.finalRound} tone="warn" /> : null}
-        </div>
-      </section>
+      {inMatch ? null : (
+        <section className={`hero-panel ${room === null ? 'lobby-hero' : 'match-panel'}`} aria-label={theme.assets.hero.alt[locale]}>
+          <div className="hero-copy">
+            <p className="eyebrow">{copy.heroEyebrow}</p>
+            <h2>{room?.roomName ?? copy.noRoomTitle}</h2>
+            <p>{room === null ? copy.noRoomDescription : copy.roomMeta(room.players.length, room.round, room.turn)}</p>
+          </div>
+          <div className="hero-meta">
+            <StatusPill label={theme.label[locale]} tone="muted" />
+            <StatusPill label={room === null ? copy.noRoomStatus : copy.roomStatus[room.status]} tone="muted" />
+          </div>
+        </section>
+      )}
 
       {room === null ? (
         <Lobby
@@ -198,8 +229,26 @@ export function App() {
           onCreate={() => void game.createRoom({ playerName: draftName, roomName })}
           onJoin={(roomId) => void game.joinRoom(roomId, draftName)}
         />
+      ) : room.status === 'lobby' ? (
+        <WaitingRoom
+          copy={copy}
+          locale={locale}
+          themeId={themeId}
+          room={room}
+          playerId={game.playerId}
+          localPlayerIds={game.localPlayerIds}
+          onlinePlayerIds={game.onlinePlayerIds}
+          busy={game.busy}
+          isHost={game.isHost}
+          seatLink={game.seatLink}
+          onStart={() => void game.startRoom()}
+          onAddDemoPlayer={() => void game.addDemoPlayer()}
+          onControlPlayer={game.selectPlayer}
+          onLeave={onLeave}
+          onKick={(targetPlayerId) => void game.kickPlayer(targetPlayerId)}
+        />
       ) : (
-        <GameTable
+        <MatchTable
           copy={copy}
           locale={locale}
           themeId={themeId}
@@ -207,49 +256,29 @@ export function App() {
           myPlayer={myPlayer}
           playerId={game.playerId}
           localPlayerIds={game.localPlayerIds}
+          onlinePlayerIds={game.onlinePlayerIds}
           busy={game.busy}
           isHost={game.isHost}
           isMyTurn={game.isMyTurn}
-          activePlayerName={game.activePlayer?.name ?? copy.watching}
+          seatLink={game.seatLink}
           lastTakeError={lastActionContext === 'take_tokens' ? game.lastError : null}
           tokenSelection={tokenSelection}
           discardSelection={discardSelection}
           evolutionSelection={evolutionSelection}
-          onTokenSelect={(token) => {
-            setLastActionContext(null);
-            setTokenSelection((current) => nextTokenSelection(current, token));
-          }}
-          onClearTokens={() => {
-            setLastActionContext(null);
-            setTokenSelection([]);
-          }}
-          onDiscardSelect={(token) => {
-            setLastActionContext(null);
-            setDiscardSelection((current) => nextDiscardSelection(current, token));
-          }}
-          onClearDiscard={() => {
-            setLastActionContext(null);
-            setDiscardSelection([]);
-          }}
+          onTokenSelectionChange={onTokenSelectionChange}
+          onDiscardSelectionChange={onDiscardSelectionChange}
           onEvolutionSelect={(selection) => {
             setLastActionContext(null);
             setEvolutionSelection(selection);
           }}
-          onTakeTokens={() => void handleTakeTokens()}
-          onStart={() => void game.startRoom()}
-          onAddDemoPlayer={() => void game.addDemoPlayer()}
+          onTakeTokens={(origins) => void handleTakeTokens(origins)}
           onControlPlayer={game.selectPlayer}
-          onLeave={() => {
-            if (room.status === 'playing' && !window.confirm(copy.confirmLeavePlaying)) return;
-            void game.leaveRoom();
-          }}
+          onLeave={onLeave}
           onPass={() => void game.passTurn()}
           onRematch={() => void game.rematch()}
-          onKick={(targetPlayerId) => void game.kickPlayer(targetPlayerId)}
-          onlinePlayerIds={game.onlinePlayerIds}
-          seatLink={game.seatLink}
           onReserve={(source) => void handleReserve(source)}
           onBuy={(source) => void handleBuy(source)}
+          onCopy={copyText}
         />
       )}
       <HelpModal open={helpOpen} initialTab={helpInitialTab} locale={locale} copy={copy as unknown as Record<string, unknown>} onClose={() => setHelpOpen(false)} />
@@ -333,53 +362,28 @@ function Lobby(props: {
     </section>
   );
 }
-
-function GameTable(props: {
+/** The pre-game room: seats, invites and the start button. The board lives in MatchTable. */
+function WaitingRoom(props: {
   copy: AppCopy;
   locale: Locale;
   themeId: ThemeId;
   room: GameState;
-  myPlayer: PlayerState | undefined;
   playerId: string;
   localPlayerIds: string[];
+  onlinePlayerIds: string[];
   busy: boolean;
   isHost: boolean;
-  isMyTurn: boolean;
-  activePlayerName: string;
-  lastTakeError: GameRoomError | null;
-  tokenSelection: TokenKind[];
-  discardSelection: TokenKind[];
-  evolutionSelection: EvolutionSelection | null;
-  onTokenSelect: (token: TokenKind) => void;
-  onClearTokens: () => void;
-  onDiscardSelect: (token: TokenKind) => void;
-  onClearDiscard: () => void;
-  onEvolutionSelect: (selection: EvolutionSelection | null) => void;
-  onTakeTokens: () => void;
+  seatLink: string | null;
   onStart: () => void;
   onAddDemoPlayer: () => void;
   onControlPlayer: (playerId: string) => void;
   onLeave: () => void;
-  onPass: () => void;
-  onRematch: () => void;
   onKick: (playerId: string) => void;
-  onlinePlayerIds: string[];
-  seatLink: string | null;
-  onReserve: (source: Extract<CardSource, { kind: 'market' | 'deck' }>) => void;
-  onBuy: (source: Exclude<CardSource, { kind: 'deck' }>) => void;
 }) {
-  const winnerNames = props.room.players.filter((player) => props.room.winnerIds.includes(player.id)).map((player) => player.name).join(', ');
-  const hasBoard = props.room.status !== 'lobby';
-  const actionDisabled = !props.isMyTurn || props.busy || props.room.status !== 'playing';
-  const actionDisabledReason = describeActionDisabledReason(props.copy, props.room, props.isMyTurn, props.busy);
-  const localPlayers = props.room.players.filter((p) => props.localPlayerIds.includes(p.id));
-  const hasAnyReserved = localPlayers.some((p) => p.reserved.length > 0);
-  const reservedCount = localPlayers.reduce((sum, player) => sum + player.reserved.length, 0);
-  const [reservedOpen, setReservedOpen] = useState(false);
-  const reservedPanelId = 'local-reserved-cards';
+  const localPlayers = props.room.players.filter((player) => props.localPlayerIds.includes(player.id));
   return (
-    <section className="table-layout standard-table">
-      <aside className="panel side-panel player-rail">
+    <section className="waiting-room">
+      <div className="panel waiting-panel">
         <div className="room-tools">
           <button type="button" className="ghost-button" onClick={() => copyRoomId(props.room.roomId)}>
             <Copy size={16} /> {props.copy.copyRoom}
@@ -392,15 +396,17 @@ function GameTable(props: {
           <button type="button" className="ghost-button" onClick={props.onLeave}>{props.copy.leave}</button>
         </div>
         {props.localPlayerIds.length === 0 ? <p className="empty">{props.copy.spectating}</p> : null}
-        <h3>{props.copy.trainers}</h3>
-        <label className="control-seat">
-          <span>{props.copy.controlSeat}</span>
-          <select value={props.playerId} disabled={props.busy || props.localPlayerIds.length === 0} onChange={(event) => props.onControlPlayer(event.target.value)}>
-            {props.room.players.filter((player) => props.localPlayerIds.includes(player.id)).map((player) => (
-              <option value={player.id} key={player.id}>{player.name}</option>
-            ))}
-          </select>
-        </label>
+        <h3>{props.copy.trainers} · {props.room.players.length}/{props.room.maxPlayers}</h3>
+        {localPlayers.length > 1 ? (
+          <label className="control-seat">
+            <span>{props.copy.controlSeat}</span>
+            <select value={props.playerId} disabled={props.busy} onChange={(event) => props.onControlPlayer(event.target.value)}>
+              {localPlayers.map((player) => (
+                <option value={player.id} key={player.id}>{player.name}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <div className="player-stack">
           {props.room.players.map((player) => (
             <PlayerPanel
@@ -409,1003 +415,26 @@ function GameTable(props: {
               locale={props.locale}
               themeId={props.themeId}
               player={player}
-              active={props.room.currentPlayerId === player.id}
+              active={false}
               controlled={props.playerId === player.id}
               local={props.localPlayerIds.includes(player.id)}
               online={props.onlinePlayerIds.includes(player.id)}
-              targetScore={props.room.targetScore ?? 18}
-              onKick={props.isHost && props.room.status === 'lobby' && player.id !== props.room.hostPlayerId ? () => props.onKick(player.id) : undefined}
+              targetScore={props.room.targetScore}
+              onKick={props.isHost && player.id !== props.room.hostPlayerId ? () => props.onKick(player.id) : undefined}
             />
           ))}
         </div>
-        {props.room.status === 'lobby' ? (
-          <div className="lobby-actions">
-            <button type="button" onClick={props.onAddDemoPlayer} disabled={props.busy || !props.isHost || props.room.players.length >= props.room.maxPlayers}>
-              <ShieldPlus size={16} /> {props.copy.demoRival}
-            </button>
-            <button type="button" className="primary-button" onClick={props.onStart} disabled={props.busy || !props.isHost || props.room.players.length < 2}>
-              {props.busy ? <span className="spinner" /> : <Play size={18} />} {props.copy.start}
-            </button>
-          </div>
-        ) : null}
-        {props.room.status === 'finished' ? (
-          <>
-            <div className="winner-box">{props.copy.winner}: {winnerNames}</div>
-            {props.isHost ? (
-              <button type="button" className="primary-button" onClick={props.onRematch} disabled={props.busy}>
-                <Play size={18} /> {props.copy.rematch}
-              </button>
-            ) : null}
-          </>
-        ) : null}
-      </aside>
-
-      <section className="play-area standard-field">
-        <div className={`panel turn-panel${props.isMyTurn && props.room.status === 'playing' ? ' is-my-turn' : ''}`}>
-          <div>
-            <p className="eyebrow">{props.copy.currentTurn}</p>
-            <h3>{props.room.status === 'playing' ? props.activePlayerName : props.copy.roomStatus[props.room.status]}</h3>
-          </div>
-          <StatusPill label={props.isMyTurn ? props.copy.yourMove : props.copy.watching} tone={props.isMyTurn ? 'good' : 'muted'} />
-          {props.isMyTurn && props.room.viewerCanPass ? (
-            <button type="button" className="primary-button" title={props.copy.passHint} onClick={props.onPass} disabled={props.busy}>
-              {props.copy.passTurn}
-            </button>
-          ) : null}
-        </div>
-
-        {hasBoard && localPlayers.length > 0 ? (
-          <div className={`reserved-row panel ${reservedOpen ? 'is-open' : 'is-collapsed'}`}>
-            <button
-              type="button"
-              className="reserved-row-header"
-              aria-controls={reservedPanelId}
-              aria-expanded={reservedOpen}
-              aria-label={reservedOpen ? props.copy.collapseReserve : props.copy.expandReserve}
-              title={reservedOpen ? props.copy.collapseReserve : props.copy.expandReserve}
-              onClick={() => setReservedOpen((open) => !open)}
-            >
-              <div>
-                <h3>{props.copy.yourReserve}</h3>
-                <span className="reserved-row-count">{reservedCount}</span>
-              </div>
-              <ChevronDown className="reserved-toggle-icon" size={18} />
-            </button>
-            <div className="reserved-body" id={reservedPanelId} aria-hidden={!reservedOpen}>
-              {!hasAnyReserved ? <p className="empty">{props.copy.noReserved}</p> : null}
-              <div className="reserved-groups">
-                {localPlayers.map((lp) => (
-                  lp.reserved.length > 0 ? (
-                    <div className="reserved-group" key={lp.id}>
-                      <span className="reserved-group-label">{lp.name}</span>
-                      <div className="reserved-cards">
-                        {lp.reserved.map((card) => isHiddenCard(card) ? (
-                          <HiddenCardChip key={card.id} copy={props.copy} tier={card.tier} />
-                        ) : (
-                          <CompanionCardView
-                            key={card.id}
-                            copy={props.copy}
-                            locale={props.locale}
-                            themeId={props.themeId}
-                            card={card}
-                            compact
-                            disabled={lp.id !== props.playerId || !props.isMyTurn || props.busy || !reservedOpen}
-                            affordable={canAfford(lp, card)}
-                            onBuy={() => props.onBuy({ kind: 'reserved', cardId: card.id })}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ) : null
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {hasBoard ? (
-          <div className="field-board">
-            <div className="field-control-stack">
-              <BankPanel
-                copy={props.copy}
-                locale={props.locale}
-                room={props.room}
-                player={props.myPlayer}
-                disabled={actionDisabled}
-                busy={props.busy}
-                disabledReason={actionDisabledReason}
-                lastTakeError={props.lastTakeError}
-                tokenSelection={props.tokenSelection}
-                discardSelection={props.discardSelection}
-                onTokenSelect={props.onTokenSelect}
-                onClearTokens={props.onClearTokens}
-                onTakeTokens={props.onTakeTokens}
-              />
-              {props.room.status === 'playing' ? (
-                <SettlementPanel
-                  copy={props.copy}
-                  locale={props.locale}
-                  room={props.room}
-                  player={props.myPlayer}
-                  disabled={actionDisabled}
-                  discardSelection={props.discardSelection}
-                  evolutionSelection={props.evolutionSelection}
-                  onDiscardSelect={props.onDiscardSelect}
-                  onClearDiscard={props.onClearDiscard}
-                  onEvolutionSelect={props.onEvolutionSelect}
-                />
-              ) : null}
-            </div>
-
-            <div className="field-market-stack">
-              <div className="market-grid">
-                {[3, 2, 1].map((tier) => (
-                  <MarketTier
-                    key={tier}
-                    copy={props.copy}
-                    locale={props.locale}
-                    themeId={props.themeId}
-                    tier={tier as CardTier}
-                    cards={props.room.board.market[tier as CardTier]}
-                    deckCount={props.room.board.deckCounts[tier as CardTier]}
-                    disabled={actionDisabled}
-                    player={props.myPlayer}
-                    onReserve={props.onReserve}
-                    onBuy={props.onBuy}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="field-side-stack">
-              <SpecialMarket
-                copy={props.copy}
-                locale={props.locale}
-                themeId={props.themeId}
-                room={props.room}
-                disabled={actionDisabled}
-                player={props.myPlayer}
-                onBuy={props.onBuy}
-              />
-
-              <section className="panel mentor-panel">
-                <h3>{props.copy.gymMentors}</h3>
-                <div className="mentor-row">
-                  {props.room.board.gymLeaders.map((leader) => (
-                    <div className={`mentor ${tokenClassName(leader.element)}`} key={leader.id}>
-                      <strong>{leaderName(leader, props.locale)}</strong>
-                      <span>{leader.points} {props.copy.glory}</span>
-                      <CostList cost={leader.requirement} />
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="panel log-panel">
-                <h3>{props.copy.battleLog}</h3>
-                <div className="log-list">
-                  {props.room.logs.slice(0, 12).map((entry) => (
-                    <div className="log-entry" key={entry.id}>
-                      <span>{props.copy.turn} {entry.turn}</span>
-                      <p>{formatLogMessage(entry, props.locale)}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-          </div>
-        ) : null}
-      </section>
-    </section>
-  );
-}
-
-function SpecialMarket(props: {
-  copy: AppCopy;
-  locale: Locale;
-  themeId: ThemeId;
-  room: GameState;
-  disabled: boolean;
-  player: PlayerState | undefined;
-  onBuy: (source: Exclude<CardSource, { kind: 'deck' }>) => void;
-}) {
-  const ranks = ['rare', 'legendary'] satisfies SpecialCardRank[];
-  const hasSpecialCards = ranks.some((rank) => props.room.board.specialMarket[rank].length > 0 || props.room.board.specialDeckCounts[rank] > 0);
-  if (!hasSpecialCards) {
-    return null;
-  }
-  return (
-    <section className="panel special-panel">
-      <div className="tier-heading">
-        <h3>{props.copy.specialCards}</h3>
-        <span>{ranks.reduce((sum, rank) => sum + props.room.board.specialMarket[rank].length, 0)} {props.copy.open}</span>
-      </div>
-      <div className="special-grid">
-        {ranks.map((rank) => (
-          <div className="special-card-slot" key={rank}>
-            <div className="special-slot-heading">
-              <span className="special-rank">{props.copy.specialRank[rank]}</span>
-              <span className="deck-count">{props.room.board.specialDeckCounts[rank]} {props.copy.deck}</span>
-            </div>
-            {props.room.board.specialMarket[rank].map((card) => (
-              <CompanionCardView
-                key={card.id}
-                copy={props.copy}
-                locale={props.locale}
-                themeId={props.themeId}
-                card={card}
-                compact
-                disabled={props.disabled}
-                affordable={props.player === undefined ? false : canAfford(props.player, card)}
-                onBuy={() => props.onBuy({ kind: 'special_market', rank, cardId: card.id })}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function BankPanel(props: {
-  copy: AppCopy;
-  locale: Locale;
-  room: GameState;
-  player: PlayerState | undefined;
-  disabled: boolean;
-  busy: boolean;
-  disabledReason: string | null;
-  lastTakeError: GameRoomError | null;
-  tokenSelection: TokenKind[];
-  discardSelection: TokenKind[];
-  onTokenSelect: (token: TokenKind) => void;
-  onClearTokens: () => void;
-  onTakeTokens: () => void;
-}) {
-  const selectionText = props.tokenSelection.length === 0 ? props.copy.noEnergySelected : props.tokenSelection.map((token) => tokenLabel(token, props.locale)).join(', ');
-  const selectionProblem = describeTokenTakeSelectionProblem(props.copy, props.locale, props.room, props.player, props.tokenSelection, props.discardSelection);
-  const serverProblem = describeTokenTakeServerProblem(props.copy, props.locale, props.lastTakeError);
-  const takeProblem = props.disabledReason ?? selectionProblem ?? serverProblem;
-  const takeDisabled = props.disabled || props.tokenSelection.length === 0 || selectionProblem !== null;
-  const selectionCounts = countTokens(props.tokenSelection);
-  return (
-    <section className="panel bank-panel">
-      <div>
-        <h3>{props.copy.energyBank}</h3>
-        <p>{selectionText}</p>
-      </div>
-      <div className="bank-tokens">
-        {(['fire', 'water', 'grass', 'electric', 'psychic'] satisfies TokenKind[]).map((token) => {
-          const selectedCount = selectionCounts[token];
-          return (
-            <button
-              type="button"
-              className={`token-button ${tokenClassName(token)}${selectedCount > 0 ? ' selected' : ''}`}
-              key={token}
-              disabled={props.disabled || props.room.board.bank[token] <= 0}
-              onClick={() => props.onTokenSelect(token)}
-              data-selected-count={selectedCount > 0 ? String(selectedCount) : ''}
-              aria-pressed={selectedCount > 0}
-              title={selectedCount === 2
-                ? `${tokenLabel(token, props.locale)} (${props.copy.clickToClear})`
-                : selectedCount === 1
-                  ? `${tokenLabel(token, props.locale)} (${props.copy.clickAgainForTwo})`
-                  : tokenLabel(token, props.locale)}
-            >
-              <span>{tokenLabel(token, props.locale)}</span>
-              <strong>{props.room.board.bank[token]}</strong>
-            </button>
-          );
-        })}
-        <div className={`token-button token-static ${tokenClassName('prism')}`} title={props.copy.prismHint}>
-          <span>{tokenLabel('prism', props.locale)}</span>
-          <strong>{props.room.board.bank.prism}</strong>
-        </div>
-      </div>
-      <p className={`action-problem${takeProblem === null ? ' is-empty' : ''}`} aria-live="polite">{takeProblem ?? ''}</p>
-      <div className="bank-actions">
-        <button type="button" onClick={props.onClearTokens} disabled={props.disabled || props.tokenSelection.length === 0}>{props.copy.clear}</button>
-        <button type="button" className="primary-button" onClick={props.onTakeTokens} disabled={takeDisabled}>
-          {props.busy ? <span className="spinner" /> : <Gem size={18} />} {props.copy.takeEnergy}
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function SettlementPanel(props: {
-  copy: AppCopy;
-  locale: Locale;
-  room: GameState;
-  player: PlayerState | undefined;
-  disabled: boolean;
-  discardSelection: TokenKind[];
-  evolutionSelection: EvolutionSelection | null;
-  onDiscardSelect: (token: TokenKind) => void;
-  onClearDiscard: () => void;
-  onEvolutionSelect: (selection: EvolutionSelection | null) => void;
-}) {
-  if (props.player === undefined) {
-    return null;
-  }
-  const candidates = evolutionCandidates(props.player, props.room, props.locale);
-  const selectedEvolutionValue = props.evolutionSelection === null ? '' : evolutionValue(props.evolutionSelection);
-  const knownSelectedEvolution = candidates.some((candidate) => evolutionValue(candidate.selection) === selectedEvolutionValue) ? selectedEvolutionValue : '';
-  const selectedDiscardText = props.discardSelection.length === 0
-    ? props.copy.noEnergySelected
-    : props.discardSelection.map((token) => tokenLabel(token, props.locale)).join(', ');
-
-  return (
-    <section className="panel settlement-panel">
-      <div className="tier-heading">
-        <h3>{props.copy.settlement}</h3>
-        <span>{props.copy.discardTokens}: {selectedDiscardText}</span>
-      </div>
-      <div className="settlement-grid">
-        <div className="settlement-block">
-          <strong>{props.copy.discardTokens}</strong>
-          <div className="bank-tokens compact-token-row">
-            {TOKEN_KIND_ORDER.map((token) => {
-              const selectedCount = props.discardSelection.filter((entry) => entry === token).length;
-              const heldCount = props.player?.tokens[token] ?? 0;
-              const selectableCount = heldCount + futureTokenAllowance(token);
-              return (
-                <button
-                  type="button"
-                  className={`mini-token token-choice ${tokenClassName(token)}`}
-                  disabled={props.disabled || selectableCount <= selectedCount}
-                  onClick={() => props.onDiscardSelect(token)}
-                  title={tokenLabel(token, props.locale)}
-                  key={token}
-                >
-                  {Math.max(heldCount - selectedCount, 0)}
-                </button>
-              );
-            })}
-          </div>
-          <button type="button" className="ghost-button small-button" disabled={props.disabled || props.discardSelection.length === 0} onClick={props.onClearDiscard}>
-            {props.copy.clear}
+        <div className="lobby-actions">
+          <button type="button" onClick={props.onAddDemoPlayer} disabled={props.busy || !props.isHost || props.room.players.length >= props.room.maxPlayers}>
+            <ShieldPlus size={16} /> {props.copy.demoRival}
+          </button>
+          <button type="button" className="primary-button" onClick={props.onStart} disabled={props.busy || !props.isHost || props.room.players.length < 2}>
+            {props.busy ? <span className="spinner" /> : <Play size={18} />} {props.copy.start}
           </button>
         </div>
-        <label className="settlement-block">
-          {props.copy.optionalEvolution}
-          <select
-            value={knownSelectedEvolution}
-            disabled={props.disabled || candidates.length === 0}
-            onChange={(event) => {
-              const candidate = candidates.find((entry) => evolutionValue(entry.selection) === event.target.value);
-              props.onEvolutionSelect(candidate?.selection ?? null);
-            }}
-          >
-            <option value="">{props.copy.noEvolution}</option>
-            {candidates.map((candidate) => (
-              <option key={evolutionValue(candidate.selection)} value={evolutionValue(candidate.selection)}>{candidate.label}</option>
-            ))}
-          </select>
-        </label>
       </div>
     </section>
   );
-}
-
-function MarketTier(props: {
-  copy: AppCopy;
-  locale: Locale;
-  themeId: ThemeId;
-  tier: CardTier;
-  cards: CompanionCard[];
-  deckCount: number;
-  disabled: boolean;
-  player: PlayerState | undefined;
-  onReserve: (source: Extract<CardSource, { kind: 'market' | 'deck' }>) => void;
-  onBuy: (source: Exclude<CardSource, { kind: 'deck' }>) => void;
-}) {
-  return (
-    <section className="panel market-tier">
-      <div className="tier-heading">
-        <h3>{props.copy.tier} {props.tier}</h3>
-        <span>{props.cards.length} {props.copy.open}</span>
-      </div>
-      <div className="market-lane">
-        <button
-          type="button"
-          className="deck-slot"
-          disabled={props.disabled || props.deckCount <= 0}
-          onClick={() => props.onReserve({ kind: 'deck', tier: props.tier })}
-          title={`${props.copy.reserveDeck} · ${props.copy.tier} ${props.tier}`}
-        >
-          <span>{props.copy.tier} {props.tier}</span>
-          <strong>{props.deckCount}</strong>
-          <small>{props.copy.reserveDeck}</small>
-        </button>
-        <div className="card-row market-card-row">
-          {props.cards.map((card) => (
-            <CompanionCardView
-              key={card.id}
-              copy={props.copy}
-              locale={props.locale}
-              themeId={props.themeId}
-              card={card}
-              disabled={props.disabled}
-              affordable={props.player === undefined ? false : canAfford(props.player, card)}
-              onReserve={() => props.onReserve({ kind: 'market', tier: props.tier, cardId: card.id })}
-              onBuy={() => props.onBuy({ kind: 'market', tier: props.tier, cardId: card.id })}
-            />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function CompanionCardView(props: {
-  copy: AppCopy;
-  locale: Locale;
-  themeId: ThemeId;
-  card: CompanionCard;
-  disabled: boolean;
-  affordable: boolean;
-  compact?: boolean;
-  onReserve?: () => void;
-  onBuy: () => void;
-}) {
-  const text = cardText(props.card, props.locale, props.themeId);
-  const art = cardArt(props.card, props.locale, props.themeId);
-  const flavor = cardFlavor(props.card, props.locale, props.themeId);
-  const cardFaceClass = art?.mode === 'card-face' ? 'card-face-card' : '';
-  const cardArtClass = art?.mode === 'card-face' ? 'card-face-art' : '';
-  const affordabilityClass = props.disabled ? '' : props.affordable ? 'affordable' : 'unaffordable';
-  const elementColor = elementColorFor(props.card.element);
-  return (
-    <article
-      className={`companion-card ${tokenClassName(props.card.element)} ${props.compact === true ? 'compact-card' : ''} ${cardFaceClass} ${affordabilityClass}`}
-      aria-label={`${text.name}, ${props.card.points} ${props.copy.glory}, ${tokenLabel(props.card.element, props.locale)} type`}
-    >
-      <div className={`card-art ${cardArtClass}`}>
-        {art === null ? <span>{text.species.slice(0, 1)}</span> : <img src={art.src} alt={art.alt} loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
-        <span className="card-element-indicator" style={{ background: elementColor }} title={`${tokenLabel(props.card.element, props.locale)} ${props.copy.type}`} />
-      </div>
-      <div className="card-body">
-        <div className="card-title">
-          <strong>{text.name}</strong>
-          <span>{props.card.points} {props.copy.glory}</span>
-        </div>
-        <small>{text.species}</small>
-        {flavor === null ? null : <p className="card-flavor">{flavor}</p>}
-        <CostList cost={props.card.cost} />
-      </div>
-      <div className="card-actions">
-        <button type="button" onClick={props.onBuy} disabled={props.disabled || !props.affordable}>{props.copy.buy}</button>
-        {props.onReserve !== undefined ? <button type="button" onClick={props.onReserve} disabled={props.disabled}>{props.copy.reserve}</button> : null}
-      </div>
-    </article>
-  );
-}
-
-function PlayerPanel(props: { copy: AppCopy; locale: Locale; themeId: ThemeId; player: PlayerState; active: boolean; controlled: boolean; local: boolean; online: boolean; targetScore?: number; onKick?: (() => void) | undefined }) {
-  const left = props.player.status === 'left';
-  const badge = left ? props.copy.leftSeat : props.controlled ? props.copy.controlled : props.local ? props.copy.localSeat : null;
-  const target = props.targetScore ?? 18;
-  const progress = Math.min(100, Math.round((props.player.score / target) * 100));
-  return (
-    <article className={`player-panel ${props.active ? 'active' : ''} ${props.controlled ? 'controlled' : ''} ${props.local ? 'local' : ''} ${left ? 'left' : ''}`}>
-      <div className="player-heading">
-        <strong>
-          <span className={`presence-dot ${props.online ? 'online' : 'offline'}`} title={props.online ? props.copy.online : props.copy.offline} aria-label={props.online ? props.copy.online : props.copy.offline} />
-          {props.player.name}{badge === null ? '' : ` · ${badge}`}
-        </strong>
-        <span>{props.player.score} {props.copy.glory}</span>
-        {props.onKick !== undefined ? <button type="button" className="ghost-button kick-button" onClick={props.onKick}>{props.copy.kick}</button> : null}
-      </div>
-      <div className="score-progress">
-        <div className="score-progress-bar" aria-hidden="true">
-          <div className="score-progress-fill" style={{ width: `${progress}%` }} />
-        </div>
-        <span className="score-progress-label">{props.copy.progressToVictory(props.player.score, target)}</span>
-      </div>
-      <div className="bonus-row">
-        {ELEMENTS.map((element) => (
-          <span className={`mini-token ${tokenClassName(element)}`} title={`${tokenLabel(element, props.locale)} ${props.copy.bonus}`} key={element}>{props.player.bonuses[element]}</span>
-        ))}
-        <span className={`mini-token ${tokenClassName('prism')}`} title={`${tokenLabel('prism', props.locale)}`}>{props.player.tokens.prism}</span>
-      </div>
-      <div className="player-token-chips">
-        {ELEMENTS.map((element) => (
-          <span className={`player-token-chip ${tokenClassName(element)}`} key={element} title={`${tokenLabel(element, props.locale)}: ${props.player.tokens[element]}`}>
-            <span className="chip-dot" style={{ background: elementColorFor(element), color: '#fff' }}>{props.player.tokens[element] > 0 ? '' : ''}</span>
-            <strong>{props.player.tokens[element]}</strong>
-          </span>
-        ))}
-      </div>
-      <div className="token-row">
-        <span>{props.copy.evolutions}: {props.player.evolutionRecords.length}</span>
-        <span>{props.copy.pokemonInPlay}: {props.player.tableau.length}</span>
-        {props.player.reserved.length > 0 ? <span className="reserved-count">{props.copy.reservedLabel}: {props.player.reserved.length}</span> : null}
-      </div>
-      <PlayerCardStrip
-        copy={props.copy}
-        locale={props.locale}
-        themeId={props.themeId}
-        label={props.copy.pokemonInPlay}
-        cards={props.player.tableau}
-      />
-      <PlayerCardStrip
-        copy={props.copy}
-        locale={props.locale}
-        themeId={props.themeId}
-        label={props.copy.reservedLabel}
-        cards={props.player.reserved}
-      />
-    </article>
-  );
-}
-
-function PlayerCardStrip(props: { copy: AppCopy; locale: Locale; themeId: ThemeId; label: string; cards: ReservedCard[] }) {
-  if (props.cards.length === 0) {
-    return null;
-  }
-  return (
-    <div className="public-card-strip">
-      <span className="public-card-strip-label">{props.label}</span>
-      <div className="public-card-list">
-        {props.cards.map((card) => isHiddenCard(card) ? (
-          <HiddenCardChip key={card.id} copy={props.copy} tier={card.tier} />
-        ) : (
-          <PublicCardChip
-            key={card.id}
-            copy={props.copy}
-            locale={props.locale}
-            themeId={props.themeId}
-            card={card}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HiddenCardChip(props: { copy: AppCopy; tier: CardTier }) {
-  const label = props.copy.hiddenCard(props.tier);
-  return (
-    <div className="public-card-chip hidden-card-chip" tabIndex={0} role="group" aria-label={label} title={label}>
-      <span>?</span>
-      <strong>{props.tier}</strong>
-    </div>
-  );
-}
-
-function PublicCardChip(props: { copy: AppCopy; locale: Locale; themeId: ThemeId; card: CompanionCard }) {
-  const text = cardText(props.card, props.locale, props.themeId);
-  const art = cardArt(props.card, props.locale, props.themeId);
-  const elementLabel = tokenLabel(props.card.element, props.locale);
-  const title = `${text.name} · ${props.card.points} ${props.copy.glory} · ${elementLabel}`;
-  return (
-    <div className={`public-card-chip ${tokenClassName(props.card.element)}`} tabIndex={0} role="group" aria-label={title}>
-      <span>{text.name.slice(0, 2)}</span>
-      <strong>{props.card.points}</strong>
-      <div className="public-card-popover" role="tooltip">
-        <div className="public-card-preview">
-          <div className="public-card-preview-art">
-            {art === null ? <span>{text.name.slice(0, 1)}</span> : <img src={art.src} alt={art.alt} loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
-          </div>
-          <div className="public-card-preview-body">
-            <div className="card-title">
-              <strong>{text.name}</strong>
-              <span>{props.card.points} {props.copy.glory}</span>
-            </div>
-            <small>{text.species}</small>
-            <span className="public-card-type">{elementLabel} {props.copy.type}</span>
-            <CostList cost={props.card.cost} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CostList(props: { cost: ElementCost }) {
-  return (
-    <div className="cost-list">
-      {ELEMENTS.map((element) => {
-        const value = props.cost[element] ?? 0;
-        if (value <= 0) return null;
-        return <span className={`cost-chip ${tokenClassName(element)}`} key={element}>{value}</span>;
-      })}
-    </div>
-  );
-}
-
-function StatusPill(props: { label: string; tone: 'good' | 'warn' | 'muted' }) {
-  return <span className={`status-pill ${props.tone}`}>{props.label}</span>;
-}
-
-function elementColorFor(element: TokenKind): string {
-  switch (element) {
-    case 'fire': return '#c6423e';
-    case 'water': return '#2473aa';
-    case 'grass': return '#4a9e5c';
-    case 'electric': return '#d7aa24';
-    case 'psychic': return '#dc8fb5';
-    case 'prism': return '#7b58c8';
-    default: return '#888';
-  }
-}
-
-function describeActionDisabledReason(copy: AppCopy, room: GameState, isMyTurn: boolean, busy: boolean): string | null {
-  if (busy) {
-    return copy.tokenTakeProblems.busy;
-  }
-  if (room.status !== 'playing') {
-    return copy.tokenTakeProblems.notPlaying;
-  }
-  if (!isMyTurn) {
-    return copy.tokenTakeProblems.notCurrentTurn;
-  }
-  return null;
-}
-
-function describeTokenTakeSelectionProblem(
-  copy: AppCopy,
-  locale: Locale,
-  room: GameState,
-  player: PlayerState | undefined,
-  tokenSelection: TokenKind[],
-  discardSelection: TokenKind[],
-): string | null {
-  if (tokenSelection.length === 0) {
-    return null;
-  }
-  if (tokenSelection.some((token) => !isElementToken(token))) {
-    return copy.tokenTakeProblems.cannotTakePrism;
-  }
-
-  const selectionCounts = countTokens(tokenSelection);
-  const entries = TOKEN_KIND_ORDER
-    .map((token) => [token, selectionCounts[token]] as const)
-    .filter(([, count]) => count > 0);
-  // Mirrors src/game/domain/token-rules.ts: three different elements, or one of each when fewer than three remain;
-  // with exactly two left, one of them may be taken twice.
-  const availableElementKinds = ELEMENTS.filter((element) => room.board.bank[element] > 0).length;
-  const isDistinctTake = tokenSelection.length === Math.min(3, availableElementKinds)
-    && entries.length === tokenSelection.length;
-  const isSparseDoubleTake = tokenSelection.length === 3 && entries.length === 2 && availableElementKinds === 2;
-  const isPair = tokenSelection.length === 2 && entries.length === 1 && entries[0]?.[1] === 2;
-
-  if (!isDistinctTake && !isSparseDoubleTake && !isPair) {
-    return copy.tokenTakeProblems.invalidPattern;
-  }
-  if (isPair) {
-    const token = entries[0]?.[0];
-    if (token === undefined || room.board.bank[token] < 4) {
-      return copy.tokenTakeProblems.pairRequiresFour;
-    }
-  }
-  for (const [token, count] of entries) {
-    if (room.board.bank[token] < count) {
-      return copy.tokenTakeProblems.bankTokenEmpty(tokenLabel(token, locale));
-    }
-  }
-
-  if (player === undefined) {
-    return null;
-  }
-  const nextTokens = countTokens([]);
-  for (const token of TOKEN_KIND_ORDER) {
-    nextTokens[token] = player.tokens[token] + selectionCounts[token];
-  }
-  const requiredDiscards = Math.max(tokenTotal(nextTokens) - 10, 0);
-  const discardCounts = countTokens(discardSelection);
-  for (const token of TOKEN_KIND_ORDER) {
-    if (discardCounts[token] > nextTokens[token]) {
-      return copy.tokenTakeProblems.invalidTokenDiscard(tokenLabel(token, locale));
-    }
-  }
-  if (discardSelection.length !== requiredDiscards) {
-    if (requiredDiscards === 0) {
-      return copy.tokenTakeProblems.unexpectedTokenDiscard;
-    }
-    return copy.tokenTakeProblems.tokenDiscardRequired(requiredDiscards);
-  }
-  return null;
-}
-
-function describeTokenTakeServerProblem(copy: AppCopy, locale: Locale, error: GameRoomError | null): string | null {
-  if (error === null) {
-    return null;
-  }
-  switch (error.code) {
-    case 'empty_token_selection':
-      return copy.tokenTakeProblems.emptySelection;
-    case 'cannot_take_prism':
-      return copy.tokenTakeProblems.cannotTakePrism;
-    case 'invalid_token_pattern':
-      return copy.tokenTakeProblems.invalidPattern;
-    case 'pair_requires_four':
-      return copy.tokenTakeProblems.pairRequiresFour;
-    case 'bank_token_empty': {
-      const token = TOKEN_KIND_ORDER.find((kind) => error.message.includes(kind));
-      return copy.tokenTakeProblems.bankTokenEmpty(token === undefined ? copy.tokenTakeProblems.thatToken : tokenLabel(token, locale));
-    }
-    case 'token_discard_required':
-      return copy.tokenTakeProblems.serverTokenDiscardRequired(error.message);
-    case 'invalid_token_discard':
-      return copy.tokenTakeProblems.invalidDiscard;
-    case 'unexpected_token_discard':
-      return copy.tokenTakeProblems.unexpectedTokenDiscard;
-    case 'not_current_turn':
-      return copy.tokenTakeProblems.notCurrentTurn;
-    case 'invalid_status':
-      return copy.tokenTakeProblems.notPlaying;
-    default:
-      return copy.tokenTakeProblems.serverFailure(error.message);
-  }
-}
-
-function nextTokenSelection(current: TokenKind[], token: TokenKind): TokenKind[] {
-  const selectionCounts = countTokens(current);
-  const currentCount = selectionCounts[token] ?? 0;
-
-  // Cycle: 0 → 1 → 2 → 0 (per token kind)
-
-  // Already at 2: remove all instances of this token (cycle back to 0).
-  if (currentCount >= 2) {
-    return current.filter((existing) => existing !== token);
-  }
-
-  // At 1: add a second one (for "take two matching" rule).
-  if (currentCount === 1) {
-    if (current.length >= 3) {
-      // Already at 3 total, switch to pair mode with just this token.
-      return [token, token];
-    }
-    return [...current, token];
-  }
-
-  // At 0: add one. If total is already at 3, start fresh.
-  if (current.length >= 3) {
-    return [token];
-  }
-  return [...current, token];
-}
-
-function nextDiscardSelection(current: TokenKind[], token: TokenKind): TokenKind[] {
-  return [...current, token];
-}
-
-function futureTokenAllowance(token: TokenKind): number {
-  return token === 'prism' ? 1 : 3;
-}
-
-function countTokens(tokens: TokenKind[]): Record<TokenKind, number> {
-  const counts = Object.fromEntries(TOKEN_KIND_ORDER.map((token) => [token, 0])) as Record<TokenKind, number>;
-  for (const token of tokens) {
-    counts[token] += 1;
-  }
-  return counts;
-}
-
-function tokenTotal(tokens: Record<TokenKind, number>): number {
-  return TOKEN_KIND_ORDER.reduce((sum, token) => sum + tokens[token], 0);
-}
-
-function isElementToken(token: TokenKind): boolean {
-  return ELEMENTS.includes(token as (typeof ELEMENTS)[number]);
-}
-
-function buildActionOptions(
-  actionKind: GameActionKind,
-  room: GameState | null,
-  player: PlayerState | undefined,
-  discardSelection: TokenKind[],
-  evolutionSelection: EvolutionSelection | null,
-  source?: Exclude<CardSource, { kind: 'deck' }>,
-): ActionOptions {
-  const options: ActionOptions = {};
-  if (shouldSendDiscardSelection(actionKind, room, player, discardSelection)) {
-    options.discardTokens = [...discardSelection];
-  }
-  if (room !== null && player !== undefined && evolutionSelection !== null && isValidEvolutionSelectionForAction(actionKind, player, room, evolutionSelection, source)) {
-    options.evolution = afterActionEvolution(actionKind, evolutionSelection, source);
-  }
-  return options;
-}
-
-function shouldSendDiscardSelection(actionKind: GameActionKind, room: GameState | null, player: PlayerState | undefined, discardSelection: TokenKind[]): boolean {
-  if (discardSelection.length === 0 || room === null || player === undefined) {
-    return false;
-  }
-  if (actionKind === 'buy_card') {
-    return false;
-  }
-  if (actionKind === 'reserve_card') {
-    const prismGain = room.board.bank.prism > 0 ? 1 : 0;
-    const requiredDiscards = Math.max(tokenTotal(player.tokens) + prismGain - 10, 0);
-    return requiredDiscards > 0 && discardSelection.length === requiredDiscards;
-  }
-  return true;
-}
-
-function canAfford(player: PlayerState, card: CompanionCard): boolean {
-  let prismNeeded = card.requiresPrism === true || card.specialRank !== undefined ? 1 : 0;
-  for (const element of ELEMENTS) {
-    const required = Math.max((card.cost[element] ?? 0) - player.bonuses[element], 0);
-    const missing = Math.max(required - player.tokens[element], 0);
-    prismNeeded += missing;
-  }
-  return prismNeeded <= player.tokens.prism;
-}
-
-function bonusValue(card: CompanionCard): number {
-  return card.bonusValue ?? (card.specialRank === undefined ? 1 : 2);
-}
-
-function evolutionCandidates(player: PlayerState, room: GameState, locale: Locale): EvolutionCandidate[] {
-  const targetCards: Array<{ card: CompanionCard; to: EvolutionSelection['to']; sourceLabel: string }> = [];
-  for (const tier of EVOLUTION_TIERS) {
-    for (const card of room.board.market[tier]) {
-      targetCards.push({
-        card,
-        to: { kind: 'market', tier, cardId: card.id },
-        sourceLabel: locale === 'zh-CN' ? `等级 ${tier}` : `tier ${tier}`,
-      });
-    }
-  }
-  for (const card of visibleCards(player.reserved)) {
-    targetCards.push({
-      card,
-      to: { kind: 'reserved', cardId: card.id },
-      sourceLabel: locale === 'zh-CN' ? '保留区' : 'reserve',
-    });
-  }
-
-  const candidates: EvolutionCandidate[] = [];
-  for (const from of player.tableau) {
-    for (const target of targetCards) {
-      if (!isEvolutionChain(from, target.card) || !canMeetEvolutionRequirementThisTurn(player, room, from, target.card)) {
-        continue;
-      }
-      const fromText = cardText(from, locale);
-      const toText = cardText(target.card, locale);
-      candidates.push({
-        selection: { fromCardId: from.id, to: target.to },
-        label: `${fromText.name} -> ${toText.name} · ${target.sourceLabel}`,
-      });
-    }
-  }
-  return candidates;
-}
-
-function isEvolutionChain(from: CompanionCard, to: CompanionCard): boolean {
-  if (from.specialRank !== undefined || to.specialRank !== undefined) {
-    return false;
-  }
-  if (to.tier !== from.tier + 1) {
-    return false;
-  }
-  const fromPokemonId = pokemonIdForEvolution(from);
-  const toPokemonId = pokemonIdForEvolution(to);
-  if (from.evolvesTo !== undefined) {
-    return from.evolvesTo.pokemonId === toPokemonId;
-  }
-  return to.evolvesFrom === from.id || to.evolvesFrom === fromPokemonId;
-}
-
-function meetsEvolutionRequirement(player: PlayerState, from: CompanionCard, to: CompanionCard): boolean {
-  if (from.evolvesTo !== undefined) {
-    return hasElementRequirement(player, from.evolvesTo.requirement);
-  }
-  return hasElementRequirement(player, to.evolutionRequirement ?? {});
-}
-
-function hasElementRequirement(player: PlayerState, requirement: ElementCost): boolean {
-  return ELEMENTS.every((element) => player.bonuses[element] >= (requirement[element] ?? 0));
-}
-
-function canMeetEvolutionRequirementThisTurn(player: PlayerState, room: GameState, from: CompanionCard, to: CompanionCard): boolean {
-  if (meetsEvolutionRequirement(player, from, to)) {
-    return true;
-  }
-  return purchasableCards(room, player)
-    .filter((card) => card.id !== to.id)
-    .some((card) => meetsEvolutionRequirement(withPurchasedBonus(player, card), from, to));
-}
-
-/** Reserving a market card moves it to the hand, so an evolution into that card targets it as reserved. */
-function afterActionEvolution(
-  actionKind: GameActionKind,
-  selection: EvolutionSelection,
-  source?: Exclude<CardSource, { kind: 'deck' }>,
-): EvolutionSelection {
-  if (actionKind === 'reserve_card' && source?.kind === 'market' && isSameEvolutionTarget(selection, source)) {
-    return { ...selection, to: { kind: 'reserved', cardId: selection.to.cardId } };
-  }
-  return selection;
-}
-
-function isValidEvolutionSelectionForAction(
-  actionKind: GameActionKind,
-  player: PlayerState,
-  room: GameState,
-  selection: EvolutionSelection,
-  source?: Exclude<CardSource, { kind: 'deck' }>,
-): boolean {
-  if (actionKind !== 'buy_card') {
-    return isValidEvolutionSelection(player, room, selection);
-  }
-  if (source === undefined || isSameEvolutionTarget(selection, source)) {
-    return false;
-  }
-  const boughtCard = findCardBySource(room, player, source);
-  if (boughtCard === undefined || !canAfford(player, boughtCard)) {
-    return false;
-  }
-  return isValidEvolutionSelection(withPurchasedBonus(player, boughtCard), room, selection);
-}
-
-function isValidEvolutionSelection(player: PlayerState, room: GameState, selection: EvolutionSelection): boolean {
-  const from = player.tableau.find((card) => card.id === selection.fromCardId);
-  const to = findEvolutionTarget(room, player, selection);
-  return from !== undefined && to !== undefined && isEvolutionChain(from, to) && meetsEvolutionRequirement(player, from, to);
-}
-
-function withPurchasedBonus(player: PlayerState, card: CompanionCard): PlayerState {
-  return {
-    ...player,
-    bonuses: {
-      ...player.bonuses,
-      [card.element]: player.bonuses[card.element] + bonusValue(card),
-    },
-  };
-}
-
-function purchasableCards(room: GameState, player: PlayerState): CompanionCard[] {
-  const cards: CompanionCard[] = [];
-  for (const tier of [1, 2, 3] satisfies CardTier[]) {
-    cards.push(...room.board.market[tier]);
-  }
-  cards.push(...visibleCards(player.reserved));
-  for (const rank of ['rare', 'legendary'] satisfies SpecialCardRank[]) {
-    cards.push(...room.board.specialMarket[rank]);
-  }
-  return cards.filter((card) => canAfford(player, card));
-}
-
-function findCardBySource(room: GameState, player: PlayerState, source: Exclude<CardSource, { kind: 'deck' }>): CompanionCard | undefined {
-  if (source.kind === 'reserved') {
-    return visibleCards(player.reserved).find((card) => card.id === source.cardId);
-  }
-  if (source.kind === 'special_market') {
-    return room.board.specialMarket[source.rank].find((card) => card.id === source.cardId);
-  }
-  return room.board.market[source.tier].find((card) => card.id === source.cardId);
-}
-
-function findEvolutionTarget(room: GameState, player: PlayerState, selection: EvolutionSelection): CompanionCard | undefined {
-  if (selection.to.kind === 'reserved') {
-    return visibleCards(player.reserved).find((card) => card.id === selection.to.cardId);
-  }
-  return room.board.market[selection.to.tier].find((card) => card.id === selection.to.cardId);
-}
-
-function isSameEvolutionTarget(selection: EvolutionSelection, source: Exclude<CardSource, { kind: 'deck' }>): boolean {
-  if (source.kind === 'reserved') {
-    return selection.to.kind === 'reserved' && selection.to.cardId === source.cardId;
-  }
-  if (source.kind === 'market') {
-    return selection.to.kind === 'market' && selection.to.tier === source.tier && selection.to.cardId === source.cardId;
-  }
-  return false;
-}
-
-function evolutionValue(selection: EvolutionSelection): string {
-  if (selection.to.kind === 'reserved') {
-    return `${selection.fromCardId}:reserved:${selection.to.cardId}`;
-  }
-  return `${selection.fromCardId}:market:${selection.to.tier}:${selection.to.cardId}`;
-}
-
-function pokemonIdForEvolution(card: CompanionCard): string {
-  return card.pokemonId ?? card.id;
 }
 
 function copyRoomId(roomId: string): void {
@@ -1419,3 +448,4 @@ function copyText(text: string): void {
 function isDefaultRoomName(value: string): boolean {
   return THEME_OPTIONS.some((theme) => LOCALE_OPTIONS.some((locale) => theme.defaultRoomName[locale.id] === value));
 }
+

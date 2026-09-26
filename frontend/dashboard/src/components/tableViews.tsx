@@ -20,7 +20,7 @@ export function CompanionCardView(props: {
   const cardFaceClass = art?.mode === 'card-face' ? 'card-face-card' : '';
   const cardArtClass = art?.mode === 'card-face' ? 'card-face-art' : '';
   const affordabilityClass = props.disabled ? '' : props.affordable ? 'affordable' : 'unaffordable';
-  const elementColor = elementColorFor(props.card.element);
+  const elementColor = elementColorFor(props.card.element, props.themeId);
   return (
     <article
       className={`companion-card ${tokenClassName(props.card.element)} ${props.compact === true ? 'compact-card' : ''} ${cardFaceClass} ${affordabilityClass}${props.pending === true ? ' is-pending' : ''}`}
@@ -77,7 +77,7 @@ export function PlayerPanel(props: { copy: AppCopy; locale: Locale; themeId: The
       <div className="player-token-chips">
         {ELEMENTS.map((element) => (
           <span className={`player-token-chip ${tokenClassName(element)}`} key={element} title={`${tokenLabel(element, props.locale)}: ${props.player.tokens[element]}`}>
-            <span className="chip-dot" style={{ background: elementColorFor(element), color: '#fff' }}>{props.player.tokens[element] > 0 ? '' : ''}</span>
+            <span className="chip-dot" style={{ background: elementColorFor(element, props.themeId), color: '#fff' }}>{props.player.tokens[element] > 0 ? '' : ''}</span>
             <strong>{props.player.tokens[element]}</strong>
           </span>
         ))}

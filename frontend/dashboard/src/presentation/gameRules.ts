@@ -1,6 +1,6 @@
 import { ELEMENTS, visibleCards, type ActionOptions, type CardSource, type CardTier, type CompanionCard, type ElementCost, type EvolutionSelection, type GameState, type PlayerState, type SpecialCardRank, type TokenKind } from '../api/types';
 import type { GameRoomError } from '../hooks/useGameRoom';
-import { APP_COPY, cardText, tokenLabel, type Locale } from './themes';
+import { APP_COPY, cardText, tokenLabel, type Locale, type ThemeId } from './themes';
 
 export type AppCopy = (typeof APP_COPY)[Locale];
 export type GameActionKind = 'take_tokens' | 'reserve_card' | 'buy_card';
@@ -14,7 +14,9 @@ export interface EvolutionCandidate {
   needsPurchase: boolean;
 }
 
-export function elementColorFor(element: TokenKind): string {
+export function elementColorFor(element: TokenKind, themeId?: ThemeId): string {
+  // The Ultra Ball is black and yellow, not the generic grass green.
+  if (element === 'grass' && themeId === 'pokemon-splendor') return '#26282e';
   switch (element) {
     case 'fire': return '#c6423e';
     case 'water': return '#2473aa';

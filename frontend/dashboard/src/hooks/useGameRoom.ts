@@ -3,6 +3,7 @@ import { ApiError, gameApi } from '../api/client';
 import type { ActionOptions, CardSource, GameState, RoomSummary, SeatGrant, TokenKind } from '../api/types';
 import { randomTrainerName } from '../presentation/randomNames';
 import { browserDefaultLocale, normalizeLocale } from '../presentation/themes';
+import { inviteAction, inviteLink as buildInviteLink, syncRoomParam } from '../runtime/invite';
 import { publicUrl, publicWsUrl } from '../runtime/publicPath';
 
 /** `{ roomId, seats: { playerId: seatToken }, controlledPlayerId }` for the room this device sits at. */
@@ -158,7 +159,8 @@ export function useGameRoom() {
     setSession({ ...current, seats, controlledPlayerId: ids.includes(current.controlledPlayerId) ? current.controlledPlayerId : ids[0]! });
   }, [setSession]);
 
-  // Restore on load: a `?room=&seat=` link (another device handing over a seat) wins over the stored session.
+  // Restore on load: a `?room=&seat=` link (another device handing over a seat) wins over the stored session;
+  // a bare `?room=` invite joins a room that still waits for players and watches one that has started.
   useEffect(() => {
     void refreshRooms();
     LEGACY_KEYS.forEach((key) => safeStorage.remove(key));
@@ -182,6 +184,21 @@ export function useGameRoom() {
         } catch {
           setError('座位链接已失效（房间已关闭或座位已被移除）');
         }
+      } else if (linkRoomId !== null && stored?.roomId !== linkRoomId) {
+        try {
+          const view = await gameApi.getRoom(linkRoomId);
+          if (inviteAction(view) === 'join') {
+            const grant = await gameApi.joinRoom(linkRoomId, playerName);
+            adoptGrant(grant, false);
+          } else {
+            setSession(null);
+            expectedViewerRef.current = null;
+            setRoom(view);
+          }
+          return;
+        } catch {
+          setError('邀请链接已失效（房间已关闭或已满员）');
+        }
       }
       if (stored === null) {
         return;
@@ -199,6 +216,13 @@ export function useGameRoom() {
     // Runs once on mount by design.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Mirror the open room in the address bar (declared after the restore effect, which reads the link first), so the
+  // address is itself an invite and a refresh while watching keeps watching.
+  const shownRoomId = room?.roomId ?? null;
+  useEffect(() => {
+    syncRoomParam(shownRoomId);
+  }, [shownRoomId]);
 
   // Drop seats that the server no longer knows (kicked, left, rematch cleanup) and keep control on a local seat.
   // Hot-seat play follows the turn only when the turn actually changes, so a manual seat switch is not undone
@@ -330,6 +354,19 @@ export function useGameRoom() {
     await run(() => gameApi.joinRoom(targetRoomId, name), (grant) => adoptGrant(grant, false));
   }, [adoptGrant, playerName, run]);
 
+  /** Watches a room without a seat: the socket stays unauthenticated and receives spectator views. */
+  const spectateRoom = useCallback(async (targetRoomId: string) => {
+    const stored = sessionRef.current;
+    const token = stored?.roomId === targetRoomId ? stored.seats[stored.controlledPlayerId] : undefined;
+    if (token === undefined) {
+      setSession(null);
+    }
+    await run(() => gameApi.getRoom(targetRoomId, token), (view) => {
+      expectedViewerRef.current = view.viewerPlayerId;
+      setRoom(view);
+    });
+  }, [run, setSession]);
+
   const selectPlayer = useCallback((nextPlayerId: string) => {
     setSession((current) => (current === null || current.seats[nextPlayerId] === undefined ? current : { ...current, controlledPlayerId: nextPlayerId }));
   }, [setSession]);
@@ -408,6 +445,9 @@ export function useGameRoom() {
     return `${window.location.origin}${publicUrl('/')}?${params.toString()}`;
   }, [room, seatToken]);
 
+  /** A token-free link to this room for friends: they join while it waits for players, and watch afterwards. */
+  const inviteLink = useMemo(() => (room === null ? null : buildInviteLink(room.roomId)), [room]);
+
   return {
     room,
     rooms,
@@ -425,11 +465,13 @@ export function useGameRoom() {
     lastError,
     connected,
     seatLink,
+    inviteLink,
     setPlayerName,
     selectPlayer,
     refreshRooms,
     createRoom,
     joinRoom,
+    spectateRoom,
     leaveRoom,
     startRoom,
     addDemoPlayer,

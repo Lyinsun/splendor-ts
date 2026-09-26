@@ -1,4 +1,4 @@
-import { CircleHelp, Copy, Dices, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users, X, Zap, ZapOff } from 'lucide-react';
+import { CircleHelp, Copy, Dices, Eye, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users, X, Zap, ZapOff } from 'lucide-react';
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import type { CardSource, EvolutionSelection, GameState, PlayerState, TokenKind } from './api/types';
 import { MatchTable } from './components/MatchTable';
@@ -148,7 +148,8 @@ export function App() {
   }, []);
 
   const onLeave = () => {
-    if (room?.status === 'playing' && !window.confirm(copy.confirmLeavePlaying)) return;
+    // Spectators hold no seat, so leaving costs nobody anything.
+    if (room?.status === 'playing' && game.localPlayerIds.length > 0 && !window.confirm(copy.confirmLeavePlaying)) return;
     void game.leaveRoom();
   };
 
@@ -234,6 +235,7 @@ export function App() {
           onRoomNameChange={setRoomName}
           onCreate={() => void game.createRoom({ playerName: draftName, roomName })}
           onJoin={(roomId) => void game.joinRoom(roomId, draftName)}
+          onSpectate={(roomId) => void game.spectateRoom(roomId)}
         />
       ) : room.status === 'lobby' ? (
         <WaitingRoom
@@ -247,6 +249,8 @@ export function App() {
           busy={game.busy}
           isHost={game.isHost}
           seatLink={game.seatLink}
+          inviteLink={game.inviteLink}
+          onJoin={() => void game.joinRoom(room.roomId, draftName)}
           onStart={() => void game.startRoom()}
           onAddDemoPlayer={() => void game.addDemoPlayer()}
           onControlPlayer={game.selectPlayer}
@@ -267,6 +271,7 @@ export function App() {
           isHost={game.isHost}
           isMyTurn={game.isMyTurn}
           seatLink={game.seatLink}
+          inviteLink={game.inviteLink}
           lastTakeError={lastActionContext === 'take_tokens' ? game.lastError : null}
           tokenSelection={tokenSelection}
           discardSelection={discardSelection}
@@ -334,6 +339,7 @@ function Lobby(props: {
   onRoomNameChange: (value: string) => void;
   onCreate: () => void;
   onJoin: (roomId: string) => void;
+  onSpectate: (roomId: string) => void;
 }) {
   return (
     <section className="lobby-grid">
@@ -365,9 +371,15 @@ function Lobby(props: {
               <strong>{room.roomName}</strong>
               <span>{props.copy.playerCount(room.players, room.maxPlayers, room.status)}</span>
             </div>
-            <button type="button" onClick={() => props.onJoin(room.roomId)} disabled={props.busy || room.status !== 'lobby'}>
-              {props.copy.join}
-            </button>
+            {room.status === 'lobby' && room.players < room.maxPlayers ? (
+              <button type="button" onClick={() => props.onJoin(room.roomId)} disabled={props.busy}>
+                {props.copy.join}
+              </button>
+            ) : (
+              <button type="button" className="ghost-button" onClick={() => props.onSpectate(room.roomId)} disabled={props.busy}>
+                <Eye size={16} /> {props.copy.spectate}
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -386,6 +398,8 @@ function WaitingRoom(props: {
   busy: boolean;
   isHost: boolean;
   seatLink: string | null;
+  inviteLink: string | null;
+  onJoin: () => void;
   onStart: () => void;
   onAddDemoPlayer: () => void;
   onControlPlayer: (playerId: string) => void;
@@ -397,9 +411,11 @@ function WaitingRoom(props: {
     <section className="waiting-room">
       <div className="panel waiting-panel">
         <div className="room-tools">
-          <button type="button" className="ghost-button" onClick={() => copyRoomId(props.room.roomId)}>
-            <Copy size={16} /> {props.copy.copyRoom}
-          </button>
+          {props.inviteLink !== null ? (
+            <button type="button" className="ghost-button" title={props.copy.inviteHint} onClick={() => copyText(props.inviteLink!)}>
+              <Copy size={16} /> {props.copy.copyInvite}
+            </button>
+          ) : null}
           {props.seatLink !== null ? (
             <button type="button" className="ghost-button" title={props.copy.seatLinkHint} onClick={() => copyText(props.seatLink!)}>
               <Copy size={16} /> {props.copy.copySeatLink}
@@ -407,7 +423,16 @@ function WaitingRoom(props: {
           ) : null}
           <button type="button" className="ghost-button" onClick={props.onLeave}>{props.copy.leave}</button>
         </div>
-        {props.localPlayerIds.length === 0 ? <p className="empty">{props.copy.spectating}</p> : null}
+        {props.localPlayerIds.length === 0 ? (
+          <p className="empty">
+            {props.copy.spectating}
+            {props.room.players.length < props.room.maxPlayers ? (
+              <button type="button" className="primary-button" onClick={props.onJoin} disabled={props.busy}>
+                <Users size={16} /> {props.copy.join}
+              </button>
+            ) : null}
+          </p>
+        ) : null}
         <h3>{props.copy.trainers} · {props.room.players.length}/{props.room.maxPlayers}</h3>
         {localPlayers.length > 1 ? (
           <label className="control-seat">
@@ -447,10 +472,6 @@ function WaitingRoom(props: {
       </div>
     </section>
   );
-}
-
-function copyRoomId(roomId: string): void {
-  copyText(roomId);
 }
 
 function copyText(text: string): void {

@@ -37,6 +37,7 @@ export interface MatchTableProps {
   isHost: boolean;
   isMyTurn: boolean;
   seatLink: string | null;
+  inviteLink: string | null;
   lastTakeError: GameRoomError | null;
   tokenSelection: TokenKind[];
   discardSelection: TokenKind[];
@@ -321,7 +322,9 @@ function TurnBar(props: MatchTableProps & { match: MatchCopy }) {
         {room.status === 'finished' && props.isHost ? (
           <button type="button" className="primary-button" onClick={props.onRematch} disabled={props.busy}><Play size={16} /> {props.copy.rematch}</button>
         ) : null}
-        <button type="button" className="ghost-button" onClick={() => props.onCopy(room.roomId)} title={props.copy.copyRoom}><Copy size={15} /> {props.copy.copyRoom}</button>
+        {props.inviteLink !== null ? (
+          <button type="button" className="ghost-button" onClick={() => props.onCopy(props.inviteLink!)} title={props.copy.inviteHint}><Copy size={15} /> {props.copy.copyInvite}</button>
+        ) : null}
         {props.seatLink !== null ? (
           <button type="button" className="ghost-button" onClick={() => props.onCopy(props.seatLink!)} title={props.copy.seatLinkHint}><Copy size={15} /> {props.copy.copySeatLink}</button>
         ) : null}

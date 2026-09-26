@@ -20,7 +20,8 @@ import {
   type SpecialCardRank,
   type TokenKind,
 } from './types.js';
-import { cloneTokenBank, createElementCounter, emptyTokenBank, isElementToken, tokenTotal } from './tokens.js';
+import { hasLegalTokenTake, validateTokenTake } from './token-rules.js';
+import { cloneTokenBank, createElementCounter, emptyTokenBank, tokenTotal } from './tokens.js';
 
 export const MAX_PLAYERS = 4;
 export const MIN_PLAYERS = 2;
@@ -43,6 +44,7 @@ export function createLobbyState(roomId: string, roomName: string, host: LobbyPl
     players: [createPlayer(host, 0)],
     board: createEmptyBoard(),
     currentPlayerId: null,
+    turnStartedAt: null,
     hostPlayerId: host.id,
     turn: 0,
     round: 1,
@@ -90,6 +92,7 @@ export function startGame(state: GameState, playerId: string, now = new Date().t
   next.board = createInitialBoard(seed, next.players.length);
   next.status = 'playing';
   next.currentPlayerId = next.players[0]?.id ?? null;
+  next.turnStartedAt = now;
   next.turn = 1;
   next.round = 1;
   next.endGameTriggeredBy = null;
@@ -167,7 +170,10 @@ export function abandonGame(state: GameState, playerId: string, now = new Date()
     throw new GameRuleError('Player not found.', 'player_not_found');
   }
   player.status = 'left';
-  appendLog(next, `${player.name} left the game.`, now);
+  // Like BGA's zombie mode: the seat is skipped from now on, and its tokens go back to the
+  // bank so the remaining players are not starved of an element for the rest of the game.
+  const returned = returnTokensToBank(next, player);
+  appendLog(next, `${player.name} left the game${returned > 0 ? ` and returned ${returned} energy to the bank` : ''}.`, now);
   if (next.hostPlayerId === playerId) {
     next.hostPlayerId = activePlayers(next)[0]?.id ?? null;
   }
@@ -176,6 +182,40 @@ export function abandonGame(state: GameState, playerId: string, now = new Date()
   } else if (activePlayers(next).length < MIN_PLAYERS) {
     finishGame(next, now);
   }
+  next.updatedAt = now;
+  return next;
+}
+
+/**
+ * A player leaves a finished table. The result stays on record, but the seat is marked
+ * `left` so a rematch does not bring it back.
+ */
+export function leaveFinishedGame(state: GameState, playerId: string, now = new Date().toISOString()): GameState {
+  const next = cloneState(state);
+  ensureStatus(next, 'finished');
+  const player = next.players.find((entry) => entry.id === playerId);
+  if (player === undefined || player.status !== 'active') {
+    throw new GameRuleError('Player not found.', 'player_not_found');
+  }
+  player.status = 'left';
+  appendLog(next, `${player.name} left the table.`, now);
+  if (next.hostPlayerId === playerId) {
+    next.hostPlayerId = activePlayers(next)[0]?.id ?? null;
+  }
+  next.updatedAt = now;
+  return next;
+}
+
+/**
+ * The current player ran out of time: the turn is skipped without acting for them
+ * (BGA-style timeout), so nobody's hand is played by the server.
+ */
+export function skipTurn(state: GameState, playerId: string, now = new Date().toISOString()): GameState {
+  const next = cloneState(state);
+  ensureStatus(next, 'playing');
+  const player = ensureCurrentPlayer(next, playerId);
+  appendLog(next, `${player.name} ran out of time; the turn was skipped.`, now);
+  advanceTurn(next, player, now);
   next.updatedAt = now;
   return next;
 }
@@ -191,6 +231,7 @@ export function returnToLobby(state: GameState, hostPlayerId: string, now = new 
   next.board = createEmptyBoard();
   next.status = 'lobby';
   next.currentPlayerId = null;
+  next.turnStartedAt = null;
   next.turn = 0;
   next.round = 1;
   next.endGameTriggeredBy = null;
@@ -202,11 +243,8 @@ export function returnToLobby(state: GameState, hostPlayerId: string, now = new 
 
 /** True when the player can take tokens, reserve, or buy; otherwise `pass_turn` is the only legal move. */
 export function hasMainAction(state: GameState, player: PlayerState): boolean {
-  const available = ELEMENTS.filter((element) => state.board.bank[element] > 0);
-  if (available.length >= 3 || available.some((element) => state.board.bank[element] >= 4)) {
-    return true;
-  }
-  if (available.length === 2 && available.some((element) => state.board.bank[element] >= 2)) {
+  // Must agree with validateTokenTake: any element left in the bank makes a take legal.
+  if (hasLegalTokenTake(state.board.bank)) {
     return true;
   }
   if (player.reserved.length < MAX_RESERVED_CARDS && CARD_TIERS.some((tier) => state.board.market[tier].length > 0 || state.board.decks[tier].length > 0)) {
@@ -337,35 +375,7 @@ function tokenCountForPlayers(playerCount: number): number {
 }
 
 function takeTokens(state: GameState, player: PlayerState, tokens: TokenKind[], now: string): void {
-  if (tokens.length === 0) {
-    throw new GameRuleError('Select tokens before taking an action.', 'empty_token_selection');
-  }
-  if (tokens.some((kind) => !isElementToken(kind))) {
-    throw new GameRuleError('Prism tokens can only be gained by reserving a card.', 'cannot_take_prism');
-  }
-  const counts = new Map<TokenKind, number>();
-  for (const token of tokens) {
-    counts.set(token, (counts.get(token) ?? 0) + 1);
-  }
-  const entries = [...counts.entries()];
-  const isThreeDifferent = tokens.length === 3 && entries.length === 3 && entries.every(([, count]) => count === 1);
-  const availableElementKinds = ELEMENTS.filter((element) => state.board.bank[element] > 0).length;
-  const isTwoKindsWhenBankSparse = tokens.length === 3 && entries.length === 2 && availableElementKinds <= 2 && entries.some(([, count]) => count === 2);
-  const isPair = tokens.length === 2 && entries.length === 1 && entries[0]?.[1] === 2;
-  if (!isThreeDifferent && !isTwoKindsWhenBankSparse && !isPair) {
-    throw new GameRuleError('Take either three different elements or two matching elements.', 'invalid_token_pattern');
-  }
-  if (isPair) {
-    const token = entries[0]?.[0];
-    if (token === undefined || state.board.bank[token] < 4) {
-      throw new GameRuleError('Taking two matching tokens requires at least four in the bank.', 'pair_requires_four');
-    }
-  }
-  for (const [token, count] of counts.entries()) {
-    if (state.board.bank[token] < count) {
-      throw new GameRuleError(`Not enough ${token} tokens remain in the bank.`, 'bank_token_empty');
-    }
-  }
+  validateTokenTake(state.board.bank, tokens);
   for (const token of tokens) {
     state.board.bank[token] -= 1;
     player.tokens[token] += 1;
@@ -642,11 +652,22 @@ function advanceTurn(state: GameState, player: PlayerState, now: string): void {
   }
 
   state.currentPlayerId = nextPlayer.id;
+  state.turnStartedAt = now;
+}
+
+function returnTokensToBank(state: GameState, player: PlayerState): number {
+  const returned = tokenTotal(player.tokens);
+  for (const kind of Object.keys(player.tokens) as TokenKind[]) {
+    state.board.bank[kind] += player.tokens[kind];
+    player.tokens[kind] = 0;
+  }
+  return returned;
 }
 
 function finishGame(state: GameState, now: string): void {
   state.status = 'finished';
   state.currentPlayerId = null;
+  state.turnStartedAt = null;
   for (const player of state.players) {
     recalculatePlayer(player);
   }

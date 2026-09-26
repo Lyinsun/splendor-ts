@@ -162,6 +162,8 @@ export interface EvolutionSelection {
 export interface ActionOptions {
   discardTokens?: TokenKind[];
   evolution?: EvolutionSelection | null;
+  /** The state version the move was decided on; the server answers 409 `stale_state` if it has moved on. */
+  expectedVersion?: number;
 }
 
 export type GameAction =

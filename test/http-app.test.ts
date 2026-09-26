@@ -67,6 +67,20 @@ describe('http api', () => {
     expect((await call('POST', '/v1/rooms', { raw: JSON.stringify({ playerName: 'a', pad: 'x'.repeat(20_000) }) })).status).toBe(413);
   });
 
+  it('answers malformed asset paths with 404 and stale versions with 409', async () => {
+    const { app, call } = testApp();
+    expect((await app.request('/dashboard-assets/%E0%A4%A')).status).toBe(404);
+    expect((await app.request('/assets/splendor-monsters/%')).status).toBe(404);
+
+    const { roomId, current, started } = await startedGame(call);
+    const body = { tokens: ['fire', 'water', 'grass'], expectedVersion: started.version - 1 };
+    const stale = await call('POST', `/v1/rooms/${roomId}/actions/take-tokens`, { token: current.seatToken, body });
+    expect(stale.status).toBe(409);
+    expect(stale.json.error_code).toBe('stale_state');
+    const badVersion = await call('POST', `/v1/rooms/${roomId}/actions/take-tokens`, { token: current.seatToken, body: { ...body, expectedVersion: 'x' } });
+    expect(badVersion.status).toBe(400);
+  });
+
   it('plays through the generic and typed action endpoints', async () => {
     const { call } = testApp();
     const { roomId, current, other, started } = await startedGame(call);

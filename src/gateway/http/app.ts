@@ -4,9 +4,9 @@ import type { AppConfig } from '../../config/config.js';
 import type { AppServices } from '../../game/application/composition.js';
 import { SeatAuthError } from '../../game/application/room-service.js';
 import {
+  actionOptions,
   asJsonObject,
   displayNameField,
-  optionalClientActionId,
   optionalDisplayNameField,
   parseActionCommand,
   PLAYER_NAME_MAX_LENGTH,
@@ -100,7 +100,7 @@ export function createHttpApp(deps: HttpAppDependencies) {
 
   app.post(route('/v1/rooms/:roomId/actions'), async (c) => {
     const body = await readJson(c);
-    return c.json(rooms.applyAction(param(c, 'roomId'), seatToken(c), parseActionCommand(body), optionalClientActionId(body)));
+    return c.json(rooms.applyAction(param(c, 'roomId'), seatToken(c), parseActionCommand(body), actionOptions(body)));
   });
 
   app.post(route('/v1/rooms/:roomId/actions/:kind'), async (c) => {
@@ -109,7 +109,7 @@ export function createHttpApp(deps: HttpAppDependencies) {
       throw new RequestValidationError(`Unknown action route: ${param(c, 'kind')}`, 'invalid_action_kind');
     }
     const body = kind === 'pass_turn' ? await readOptionalJson(c) : await readJson(c);
-    return c.json(rooms.applyAction(param(c, 'roomId'), seatToken(c), parseActionCommand(body, kind), optionalClientActionId(body)));
+    return c.json(rooms.applyAction(param(c, 'roomId'), seatToken(c), parseActionCommand(body, kind), actionOptions(body)));
   });
 
   return app;

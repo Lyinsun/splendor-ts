@@ -37,16 +37,32 @@ export const gameApi = {
     action(roomId, seatToken, 'reserve', { source, ...options }),
   buyCard: (roomId: string, seatToken: string, source: Exclude<CardSource, { kind: 'deck' }>, options: ActionOptions = {}) =>
     action(roomId, seatToken, 'buy', { source, ...options }),
-  passTurn: (roomId: string, seatToken: string) => action(roomId, seatToken, 'pass', {}),
+  passTurn: (roomId: string, seatToken: string, options: Pick<ActionOptions, 'expectedVersion'> = {}) => action(roomId, seatToken, 'pass', { ...options }),
 };
 
-/** A fresh clientActionId per submit lets the server drop duplicate retries. */
-function action(roomId: string, seatToken: string, route: string, body: Record<string, unknown>) {
-  return request<GameState>(`/v1/rooms/${roomId}/actions/${route}`, {
+/**
+ * One clientActionId per submit, reused by the single automatic retry: if the first attempt reached the server
+ * but its response was lost (network drop / timeout), the retry replays that id and the server returns the
+ * current state instead of settling the move twice (Stripe-style idempotency keys).
+ */
+async function action(roomId: string, seatToken: string, route: string, body: Record<string, unknown>) {
+  const send = () => request<GameState>(`/v1/rooms/${roomId}/actions/${route}`, {
     method: 'POST',
     seatToken,
-    body: { ...body, clientActionId: newClientActionId() },
+    body: { ...body, clientActionId },
   });
+  const clientActionId = newClientActionId();
+  try {
+    return await send();
+  } catch (caught) {
+    if (!isRetryable(caught)) throw caught;
+    return send();
+  }
+}
+
+/** Only transport failures are retried; a rule rejection (4xx with a body) is final. */
+function isRetryable(caught: unknown): boolean {
+  return caught instanceof TypeError || (caught instanceof ApiError && caught.code === 'timeout');
 }
 
 function newClientActionId(): string {

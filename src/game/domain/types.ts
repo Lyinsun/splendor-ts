@@ -93,6 +93,8 @@ export interface GameState {
   players: PlayerState[];
   board: BoardState;
   currentPlayerId: string | null;
+  /** When the current turn began; drives turn timeouts. Absent in snapshots saved before it existed. */
+  turnStartedAt?: string | null;
   hostPlayerId: string | null;
   turn: number;
   round: number;

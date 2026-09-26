@@ -1,7 +1,7 @@
 import type { IncomingMessage, Server } from 'node:http';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
 import type { RoomService } from '../../game/application/room-service.js';
-import { asJsonObject, optionalClientActionId, parseActionCommand, RequestValidationError, stringField } from '../protocol/action-dto.js';
+import { actionOptions, asJsonObject, parseActionCommand, RequestValidationError, stringField } from '../protocol/action-dto.js';
 import { describeError } from '../protocol/errors.js';
 
 /**
@@ -9,7 +9,10 @@ import { describeError } from '../protocol/errors.js';
  * `{ type: 'auth', seatToken }` (tokens never go in the URL, so they stay out of proxy logs).
  *
  * Client -> server: auth | action | ping
- * Server -> client: room_state | auth_ok | action_result | room_closed | pong | error
+ * Server -> client: room_state | auth_ok | action_result | seat_revoked | room_closed | pong | error
+ *
+ * A socket's seat is re-checked on every broadcast: once its token is revoked (kicked, left,
+ * dropped by a rematch) it gets `seat_revoked` and continues as a spectator.
  */
 interface RoomSocket {
   roomId: string;
@@ -123,7 +126,7 @@ export class RoomWebSocketHub {
           throw new RequestValidationError('Send { type: "auth", seatToken } before submitting actions.', 'not_authenticated');
         }
         const command = parseActionCommand(asJsonObject(message.action, 'action'));
-        const room = this.rooms.applyAction(entry.roomId, entry.seatToken, command, optionalClientActionId(message));
+        const room = this.rooms.applyAction(entry.roomId, entry.seatToken, command, actionOptions(message));
         send(entry.socket, { type: 'action_result', requestId, ok: true, version: room.version });
         return;
       }
@@ -145,7 +148,30 @@ export class RoomWebSocketHub {
         entry.socket.close(4410, 'room closed');
         continue;
       }
-      this.sendState(entry);
+      this.revalidateSeat(entry);
+    }
+    if (closed) {
+      return;
+    }
+    // Presence is computed after every seat was re-checked, so revoked seats never show as online.
+    for (const entry of this.sockets) {
+      if (entry.roomId === roomId) {
+        this.sendState(entry);
+      }
+    }
+  }
+
+  private revalidateSeat(entry: RoomSocket): void {
+    if (entry.seatToken === null) {
+      return;
+    }
+    try {
+      this.rooms.authenticate(entry.roomId, entry.seatToken);
+    } catch {
+      const playerId = entry.playerId;
+      entry.seatToken = null;
+      entry.playerId = null;
+      send(entry.socket, { type: 'seat_revoked', roomId: entry.roomId, playerId });
     }
   }
 

@@ -112,7 +112,7 @@ export function App() {
 
   const handleReserve = async (source: Extract<CardSource, { kind: 'market' | 'deck' }>) => {
     setLastActionContext(null);
-    const next = await game.reserveCard(source, actionOptions('reserve_card'));
+    const next = await game.reserveCard(source, actionOptions('reserve_card', source.kind === 'market' ? source : undefined));
     if (next !== null) {
       clearSettlementDraft();
     }
@@ -1063,15 +1063,13 @@ function describeTokenTakeSelectionProblem(
   const entries = TOKEN_KIND_ORDER
     .map((token) => [token, selectionCounts[token]] as const)
     .filter(([, count]) => count > 0);
-  const isThreeDifferent = tokenSelection.length === 3 && entries.length === 3 && entries.every(([, count]) => count === 1);
+  // Mirrors src/game/domain/token-rules.ts: three different elements, or one of each when fewer than three remain.
   const availableElementKinds = ELEMENTS.filter((element) => room.board.bank[element] > 0).length;
-  const isTwoKindsWhenBankSparse = tokenSelection.length === 3
-    && entries.length === 2
-    && availableElementKinds <= 2
-    && entries.some(([, count]) => count === 2);
+  const isDistinctTake = tokenSelection.length === Math.min(3, availableElementKinds)
+    && entries.length === tokenSelection.length;
   const isPair = tokenSelection.length === 2 && entries.length === 1 && entries[0]?.[1] === 2;
 
-  if (!isThreeDifferent && !isTwoKindsWhenBankSparse && !isPair) {
+  if (!isDistinctTake && !isPair) {
     return copy.tokenTakeProblems.invalidPattern;
   }
   if (isPair) {
@@ -1205,7 +1203,7 @@ function buildActionOptions(
     options.discardTokens = [...discardSelection];
   }
   if (room !== null && player !== undefined && evolutionSelection !== null && isValidEvolutionSelectionForAction(actionKind, player, room, evolutionSelection, source)) {
-    options.evolution = evolutionSelection;
+    options.evolution = afterActionEvolution(actionKind, evolutionSelection, source);
   }
   return options;
 }
@@ -1308,6 +1306,18 @@ function canMeetEvolutionRequirementThisTurn(player: PlayerState, room: GameStat
   return purchasableCards(room, player)
     .filter((card) => card.id !== to.id)
     .some((card) => meetsEvolutionRequirement(withPurchasedBonus(player, card), from, to));
+}
+
+/** Reserving a market card moves it to the hand, so an evolution into that card targets it as reserved. */
+function afterActionEvolution(
+  actionKind: GameActionKind,
+  selection: EvolutionSelection,
+  source?: Exclude<CardSource, { kind: 'deck' }>,
+): EvolutionSelection {
+  if (actionKind === 'reserve_card' && source?.kind === 'market' && isSameEvolutionTarget(selection, source)) {
+    return { ...selection, to: { kind: 'reserved', cardId: selection.to.cardId } };
+  }
+  return selection;
 }
 
 function isValidEvolutionSelectionForAction(

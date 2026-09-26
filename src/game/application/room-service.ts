@@ -5,9 +5,11 @@ import {
   applyGameAction,
   createLobbyState,
   kickPlayerFromLobby,
+  leaveFinishedGame,
   MAX_PLAYERS,
   removePlayerFromLobby,
   returnToLobby,
+  skipTurn,
   startGame,
 } from '../domain/engine.js';
 import { listLegalGameActions, type LegalGameActionList } from '../domain/legal-actions.js';
@@ -39,10 +41,24 @@ export interface SeatGrant {
   seatToken: string;
 }
 
+/**
+ * Retry and concurrency controls for an action, modelled on Stripe idempotency keys and
+ * boardgame.io's stateID check.
+ */
+export interface ActionOptions {
+  /** One id per logical move; a retry with the same id returns the current state instead of acting twice. */
+  clientActionId?: string;
+  /** The `version` the client was looking at. A mismatch is rejected as `stale_state` (409). */
+  expectedVersion?: number;
+}
+
+/** Record fields a commit may replace alongside the game state. */
+type RecordChanges = Partial<Pick<RoomRecord, 'seatTokenHashes' | 'recentActionIds'>>;
+
 export interface RoomServiceOptions {
   repository?: RoomRepository;
   maxRooms?: number;
-  /** 0 disables automatic play for idle turns. */
+  /** 0 disables turn timeouts; otherwise an idle turn is skipped (never played for the player). */
   turnTimeoutMs?: number;
   /** Idle time after which a room is garbage-collected, per status. */
   idleTtlMs?: Partial<Record<GameState['status'], number>>;
@@ -108,8 +124,9 @@ export class RoomService {
     const seatToken = createSeatToken();
     const state = createLobbyState(roomId, input.roomName?.trim() || `${input.playerName || 'Trainer'}'s table`, { id: playerId, name: input.playerName }, this.now());
     const record: RoomRecord = { state, seatTokenHashes: { [playerId]: hashToken(seatToken) }, recentActionIds: [] };
+    this.repository.save(record);
     this.rooms.set(roomId, record);
-    this.persist(record);
+    this.emit(roomId);
     return { room: this.view(record, playerId), playerId, seatToken };
   }
 
@@ -170,35 +187,47 @@ export class RoomService {
     return this.view(record, playerId);
   }
 
-  applyAction(roomId: string, seatToken: string, command: ActionCommand, clientActionId?: string): RoomView {
+  applyAction(roomId: string, seatToken: string, command: ActionCommand, options: ActionOptions = {}): RoomView {
     const record = this.requireRoom(roomId);
     const playerId = this.authenticateRecord(record, seatToken);
+    const { clientActionId, expectedVersion } = options;
+    // Replays win over the version check: a retry legitimately carries the version from before its first attempt.
     if (clientActionId !== undefined && record.recentActionIds.includes(clientActionId)) {
       return this.view(record, playerId);
     }
-    const next = applyGameAction(record.state, { ...command, playerId } as GameAction, this.now());
-    if (clientActionId !== undefined) {
-      record.recentActionIds = [...record.recentActionIds, clientActionId].slice(-RECENT_ACTION_LIMIT);
+    if (expectedVersion !== undefined && expectedVersion !== record.state.version) {
+      throw new GameRuleError(
+        `The room moved on (version ${record.state.version}, you acted on ${expectedVersion}). Refresh and try again.`,
+        'stale_state',
+      );
     }
-    this.commit(record, next);
+    const next = applyGameAction(record.state, { ...command, playerId } as GameAction, this.now());
+    this.commit(record, next, clientActionId === undefined
+      ? {}
+      : { recentActionIds: [...record.recentActionIds, clientActionId].slice(-RECENT_ACTION_LIMIT) });
     return this.view(record, playerId);
   }
 
-  /** Returns null when the last player left and the room was closed. */
+  /**
+   * Leaving always revokes the seat token. In a lobby the seat disappears; mid-game it becomes
+   * a skipped `left` seat; on a finished table it is excluded from a rematch.
+   * Returns null when no seat is left and the room was closed.
+   */
   leaveRoom(roomId: string, seatToken: string): RoomView | null {
     const record = this.requireRoom(roomId);
     const playerId = this.authenticateRecord(record, seatToken);
-    if (record.state.status === 'lobby') {
-      const next = removePlayerFromLobby(record.state, playerId, this.now());
-      delete record.seatTokenHashes[playerId];
-      if (next.players.length === 0) {
-        this.deleteRoom(roomId);
-        return null;
-      }
-      this.commit(record, next);
-    } else if (record.state.status === 'playing') {
-      this.commit(record, abandonGame(record.state, playerId, this.now()));
+    const now = this.now();
+    const next = record.state.status === 'lobby'
+      ? removePlayerFromLobby(record.state, playerId, now)
+      : record.state.status === 'playing'
+        ? abandonGame(record.state, playerId, now)
+        : leaveFinishedGame(record.state, playerId, now);
+    const seatTokenHashes = withoutSeat(record.seatTokenHashes, playerId);
+    if (Object.keys(seatTokenHashes).length === 0) {
+      this.deleteRoom(roomId);
+      return null;
     }
+    this.commit(record, next, { seatTokenHashes });
     return this.view(record, null);
   }
 
@@ -206,8 +235,7 @@ export class RoomService {
     const record = this.requireRoom(roomId);
     const hostId = this.authenticateRecord(record, seatToken);
     const next = kickPlayerFromLobby(record.state, hostId, targetPlayerId, this.now());
-    delete record.seatTokenHashes[targetPlayerId];
-    this.commit(record, next);
+    this.commit(record, next, { seatTokenHashes: withoutSeat(record.seatTokenHashes, targetPlayerId) });
     return this.view(record, hostId);
   }
 
@@ -216,37 +244,36 @@ export class RoomService {
     const hostId = this.authenticateRecord(record, seatToken);
     const next = returnToLobby(record.state, hostId, this.now());
     const remaining = new Set(next.players.map((player) => player.id));
-    record.seatTokenHashes = Object.fromEntries(Object.entries(record.seatTokenHashes).filter(([id]) => remaining.has(id)));
-    this.commit(record, next);
+    const seatTokenHashes = Object.fromEntries(Object.entries(record.seatTokenHashes).filter(([id]) => remaining.has(id)));
+    this.commit(record, next, { seatTokenHashes });
     return this.view(record, hostId);
   }
 
   /**
-   * Plays for players whose turn has been idle longer than the timeout, so one absent
-   * device cannot freeze the table. Returns the number of turns auto-played.
+   * Skips turns that have been idle longer than the timeout, so one absent device cannot
+   * freeze the table. Like BGA, the server never plays a move on the player's behalf.
+   * Returns the number of turns skipped.
    */
   expireIdleTurns(): number {
     if (this.turnTimeoutMs <= 0) {
       return 0;
     }
-    let played = 0;
+    let skipped = 0;
     const now = this.clock().getTime();
     for (const record of this.rooms.values()) {
       const { state } = record;
       if (state.status !== 'playing' || state.currentPlayerId === null) {
         continue;
       }
-      if (now - Date.parse(state.updatedAt) < this.turnTimeoutMs) {
+      // Snapshots from before turnStartedAt existed fall back to the last state change.
+      const turnStartedAt = Date.parse(state.turnStartedAt ?? state.updatedAt);
+      if (now - turnStartedAt < this.turnTimeoutMs) {
         continue;
       }
-      const action = pickTimeoutAction(listLegalGameActions(state, state.currentPlayerId));
-      if (action === undefined) {
-        continue;
-      }
-      this.commit(record, applyGameAction(state, action, this.now()));
-      played += 1;
+      this.commit(record, skipTurn(state, state.currentPlayerId, this.now()));
+      skipped += 1;
     }
-    return played;
+    return skipped;
   }
 
   /** Drops rooms that have been idle past their TTL. Returns the removed room ids. */
@@ -277,20 +304,20 @@ export class RoomService {
     const playerId = createId('player');
     const seatToken = createSeatToken();
     const next = addPlayerToLobby(record.state, { id: playerId, name: playerName }, this.now());
-    record.seatTokenHashes[playerId] = hashToken(seatToken);
-    this.commit(record, next);
+    this.commit(record, next, { seatTokenHashes: { ...record.seatTokenHashes, [playerId]: hashToken(seatToken) } });
     return { room: this.view(record, playerId), playerId, seatToken };
   }
 
-  private commit(record: RoomRecord, next: GameState): void {
+  /**
+   * Persist first, then swap the in-memory record: if the write throws, memory still matches
+   * the database and no client has seen a state that would vanish on restart.
+   */
+  private commit(record: RoomRecord, next: GameState, changes: RecordChanges = {}): void {
     next.version = record.state.version + 1;
-    record.state = next;
-    this.persist(record);
-  }
-
-  private persist(record: RoomRecord): void {
-    this.repository.save(record);
-    this.emit(record.state.roomId);
+    const updated: RoomRecord = { ...record, ...changes, state: next };
+    this.repository.save(updated);
+    Object.assign(record, updated);
+    this.emit(next.roomId);
   }
 
   private deleteRoom(roomId: string): void {
@@ -347,10 +374,8 @@ export function roomErrorStatus(error: unknown): number {
   return 500;
 }
 
-/** Prefer a harmless token take on timeout; fall back to whatever is legal (including pass). */
-function pickTimeoutAction(legal: LegalGameActionList): GameAction | undefined {
-  const take = legal.actions.find((option) => option.kind === 'take_tokens');
-  return (take ?? legal.actions.find((option) => option.kind === 'pass_turn') ?? legal.actions[0])?.action;
+function withoutSeat(hashes: Record<string, string>, playerId: string): Record<string, string> {
+  return Object.fromEntries(Object.entries(hashes).filter(([id]) => id !== playerId));
 }
 
 function createSeatToken(): string {

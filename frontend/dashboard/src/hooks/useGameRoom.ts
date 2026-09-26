@@ -22,7 +22,7 @@ interface SeatSession {
 }
 
 interface WsMessage {
-  type: 'room_state' | 'auth_ok' | 'action_result' | 'room_closed' | 'pong' | 'error';
+  type: 'room_state' | 'auth_ok' | 'action_result' | 'seat_revoked' | 'room_closed' | 'pong' | 'error';
   requestId?: string;
   room?: GameState;
   onlinePlayerIds?: string[];
@@ -60,6 +60,8 @@ export function useGameRoom() {
   const hostSeatToken = room?.hostPlayerId == null ? undefined : session?.seats[room.hostPlayerId];
   const isHost = hostSeatToken !== undefined;
 
+  const sessionRef = useRef<SeatSession | null>(session);
+  sessionRef.current = session;
   const setSession = useCallback((next: SeatSession | null | ((current: SeatSession | null) => SeatSession | null)) => {
     setSessionState((current) => {
       const resolved = typeof next === 'function' ? next(current) : next;
@@ -101,14 +103,45 @@ export function useGameRoom() {
     }
   }, [reportError]);
 
-  const adoptGrant = useCallback((grant: SeatGrant, keepExistingSeats: boolean) => {
-    expectedViewerRef.current = grant.playerId;
-    setSession((current) => ({
-      roomId: grant.room.roomId,
-      seats: { ...(keepExistingSeats && current?.roomId === grant.room.roomId ? current.seats : {}), [grant.playerId]: grant.seatToken },
-      controlledPlayerId: grant.playerId,
-    }));
-    setRoom(grant.room);
+  /**
+   * Stores a newly granted seat. `takeControl: false` (e.g. adding a local demo seat) keeps controlling the current
+   * seat, so the view does not jump to the new player.
+   */
+  const adoptGrant = useCallback((grant: SeatGrant, keepExistingSeats: boolean, takeControl = true) => {
+    const current = sessionRef.current;
+    const keepSeats = keepExistingSeats && current?.roomId === grant.room.roomId ? current.seats : {};
+    const keepControl = !takeControl && current !== null && keepSeats[current.controlledPlayerId] !== undefined;
+    const controlledPlayerId = keepControl ? current.controlledPlayerId : grant.playerId;
+    setSession({ roomId: grant.room.roomId, seats: { ...keepSeats, [grant.playerId]: grant.seatToken }, controlledPlayerId });
+    if (!keepControl) {
+      expectedViewerRef.current = grant.playerId;
+      setRoom(grant.room);
+    }
+  }, [setSession]);
+
+  /**
+   * The server revoked a seat (kicked, left from another device, rematch cleanup). Drop it and keep playing any other
+   * local seat; with none left the socket is a spectator, so accept spectator views instead of freezing.
+   */
+  const dropSeat = useCallback((revokedPlayerId: string | undefined) => {
+    const current = sessionRef.current;
+    const target = revokedPlayerId ?? current?.controlledPlayerId;
+    if (current === null || target === undefined || current.seats[target] === undefined) {
+      return;
+    }
+    const seats = { ...current.seats };
+    delete seats[target];
+    const ids = Object.keys(seats);
+    if (target === current.controlledPlayerId) {
+      // Until the socket re-authenticates as another seat it receives spectator views.
+      expectedViewerRef.current = null;
+    }
+    if (ids.length === 0) {
+      setSession(null);
+      setError('你的座位已被移除，当前以观众身份观看');
+      return;
+    }
+    setSession({ ...current, seats, controlledPlayerId: ids.includes(current.controlledPlayerId) ? current.controlledPlayerId : ids[0]! });
   }, [setSession]);
 
   // Restore on load: a `?room=&seat=` link (another device handing over a seat) wins over the stored session.
@@ -153,8 +186,10 @@ export function useGameRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Drop seats that the server no longer knows (kicked, left, rematch cleanup) and keep control on a local seat,
-  // preferring whichever local seat is on turn so hot-seat play follows the turn order.
+  // Drop seats that the server no longer knows (kicked, left, rematch cleanup) and keep control on a local seat.
+  // Hot-seat play follows the turn only when the turn actually changes, so a manual seat switch is not undone
+  // by the next push.
+  const followedTurnRef = useRef<string | null>(null);
   useEffect(() => {
     if (room === null || session === null || session.roomId !== room.roomId) {
       return;
@@ -162,7 +197,9 @@ export function useGameRoom() {
     const activeIds = new Set(room.players.filter((player) => player.status !== 'left').map((player) => player.id));
     const seats = Object.fromEntries(Object.entries(session.seats).filter(([id]) => activeIds.has(id)));
     const ids = Object.keys(seats);
-    const onTurn = room.currentPlayerId !== null && ids.includes(room.currentPlayerId) ? room.currentPlayerId : null;
+    const turnChanged = room.currentPlayerId !== followedTurnRef.current;
+    followedTurnRef.current = room.currentPlayerId;
+    const onTurn = turnChanged && room.currentPlayerId !== null && ids.includes(room.currentPlayerId) ? room.currentPlayerId : null;
     const controlledPlayerId = onTurn ?? (ids.includes(session.controlledPlayerId) ? session.controlledPlayerId : ids[0] ?? '');
     if (ids.length === Object.keys(session.seats).length && controlledPlayerId === session.controlledPlayerId) {
       return;
@@ -218,15 +255,11 @@ export function useGameRoom() {
           setOnlinePlayerIds(message.onlinePlayerIds ?? []);
         } else if (message.type === 'room_closed' || message.error_code === 'room_not_found') {
           resetToHall('房间已关闭，已返回大厅');
+        } else if (message.type === 'seat_revoked') {
+          dropSeat(message.playerId);
         } else if (message.requestId === 'auth' && message.ok === false) {
-          // Our seat was revoked (kicked or rematch cleanup): fall back to spectating.
-          setSession((current) => {
-            if (current === null) return null;
-            const seats = { ...current.seats };
-            delete seats[current.controlledPlayerId];
-            const ids = Object.keys(seats);
-            return ids.length === 0 ? null : { ...current, seats, controlledPlayerId: ids[0]! };
-          });
+          // The stored token no longer authenticates (revoked while this device was offline).
+          dropSeat(undefined);
         } else if (message.type === 'error' || message.ok === false) {
           reportError(new ApiError(message.error ?? 'WebSocket error', 0, message.error_code));
         }
@@ -244,7 +277,7 @@ export function useGameRoom() {
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [acceptRoom, reportError, resetToHall, roomId, setSession]);
+  }, [acceptRoom, dropSeat, reportError, resetToHall, roomId]);
 
   // Switching the controlled seat re-authenticates the same socket so the pushed view follows it.
   useEffect(() => {
@@ -310,7 +343,7 @@ export function useGameRoom() {
 
   const addDemoPlayer = useCallback(async () => {
     if (room === null || hostSeatToken === undefined) return;
-    await run(() => gameApi.addDemoPlayer(room.roomId, hostSeatToken), (grant) => adoptGrant(grant, true));
+    await run(() => gameApi.addDemoPlayer(room.roomId, hostSeatToken), (grant) => adoptGrant(grant, true, false));
   }, [adoptGrant, hostSeatToken, room, run]);
 
   const kickPlayer = useCallback(async (targetPlayerId: string) => {
@@ -323,21 +356,36 @@ export function useGameRoom() {
     await run(() => gameApi.rematch(room.roomId, hostSeatToken), acceptRoom);
   }, [acceptRoom, hostSeatToken, room, run]);
 
-  const withSeat = useCallback((task: (targetRoomId: string, token: string) => Promise<GameState>) => {
+  /**
+   * Moves carry the version they were decided on. If the room moved on meanwhile the server answers `stale_state`;
+   * we then pull the latest view so the player re-decides on current information instead of acting blind.
+   */
+  const withSeat = useCallback((task: (targetRoomId: string, token: string, expectedVersion: number) => Promise<GameState>) => {
     if (room === null || seatToken === undefined) return Promise.resolve(null);
-    return run(() => task(room.roomId, seatToken), acceptRoom);
+    const targetRoomId = room.roomId;
+    return run(async () => {
+      try {
+        return await task(targetRoomId, seatToken, room.version);
+      } catch (caught) {
+        if (caught instanceof ApiError && caught.code === 'stale_state') {
+          void gameApi.getRoom(targetRoomId, seatToken).then(acceptRoom).catch(() => undefined);
+          throw new ApiError('局面已更新，已刷新到最新状态，请确认后重新操作', caught.status, caught.code);
+        }
+        throw caught;
+      }
+    }, acceptRoom);
   }, [acceptRoom, room, run, seatToken]);
 
   const takeTokens = useCallback((tokens: TokenKind[], options: ActionOptions = {}) =>
-    withSeat((id, token) => gameApi.takeTokens(id, token, tokens, options)), [withSeat]);
+    withSeat((id, token, expectedVersion) => gameApi.takeTokens(id, token, tokens, { ...options, expectedVersion })), [withSeat]);
 
   const reserveCard = useCallback((source: Extract<CardSource, { kind: 'market' | 'deck' }>, options: ActionOptions = {}) =>
-    withSeat((id, token) => gameApi.reserveCard(id, token, source, options)), [withSeat]);
+    withSeat((id, token, expectedVersion) => gameApi.reserveCard(id, token, source, { ...options, expectedVersion })), [withSeat]);
 
   const buyCard = useCallback((source: Exclude<CardSource, { kind: 'deck' }>, options: ActionOptions = {}) =>
-    withSeat((id, token) => gameApi.buyCard(id, token, source, options)), [withSeat]);
+    withSeat((id, token, expectedVersion) => gameApi.buyCard(id, token, source, { ...options, expectedVersion })), [withSeat]);
 
-  const passTurn = useCallback(() => withSeat((id, token) => gameApi.passTurn(id, token)), [withSeat]);
+  const passTurn = useCallback(() => withSeat((id, token, expectedVersion) => gameApi.passTurn(id, token, { expectedVersion })), [withSeat]);
 
   /** A link that hands the controlled seat to another device (anyone holding it can play this seat). */
   const seatLink = useMemo(() => {

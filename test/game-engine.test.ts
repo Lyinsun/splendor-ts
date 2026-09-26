@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { normalizePublicBasePath } from '../src/config/config.js';
 import { COMPANION_CARDS, GYM_LEADERS } from '../src/game/domain/content.js';
-import { addPlayerToLobby, applyGameAction, createLobbyState, startGame } from '../src/game/domain/engine.js';
+import { abandonGame, addPlayerToLobby, applyGameAction, createLobbyState, leaveFinishedGame, returnToLobby, skipTurn, startGame } from '../src/game/domain/engine.js';
 import { listLegalGameActions } from '../src/game/domain/legal-actions.js';
 import { GameRuleError, type CompanionCard, type Element } from '../src/game/domain/types.js';
 import { createElementCounter, emptyTokenBank } from '../src/game/domain/tokens.js';
@@ -127,19 +127,51 @@ describe('game engine', () => {
     expect(next.currentPlayerId).toBe('p2');
   });
 
-  it('rejects sparse-bank token selections that exceed an available token count', () => {
+  it('follows the official sparse-bank rule: one of each remaining element, never a padded pair', () => {
     const game = startedGame();
     game.board.bank = { fire: 1, water: 2, grass: 0, electric: 0, psychic: 0, prism: 5 };
 
     expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'fire', 'water'] })).toThrow(GameRuleError);
+    expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['water', 'water', 'fire'] })).toThrow(GameRuleError);
+    expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['water'] })).toThrow(GameRuleError);
 
-    const next = applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['water', 'water', 'fire'] });
+    const next = applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['water', 'fire'] });
     const player = next.players.find((entry) => entry.id === 'p1');
 
-    expect(player?.tokens.water).toBe(2);
+    expect(player?.tokens.water).toBe(1);
     expect(player?.tokens.fire).toBe(1);
-    expect(next.board.bank.water).toBe(0);
+    expect(next.board.bank.water).toBe(1);
     expect(next.board.bank.fire).toBe(0);
+    expect(listLegalGameActions(game, 'p1').actions.filter((option) => option.kind === 'take_tokens').map((option) => option.action))
+      .toEqual([{ kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'water'] }]);
+  });
+
+  it('requires three different elements while three or more remain, and a stack of four for a pair', () => {
+    const game = startedGame();
+    game.board.bank = { fire: 3, water: 1, grass: 1, electric: 0, psychic: 0, prism: 5 };
+
+    expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'water'] })).toThrow(GameRuleError);
+    expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'fire'] })).toThrow(/at least 4/);
+    expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'electric', 'water'] })).toThrow(GameRuleError);
+    expect(applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'water', 'grass'] }).board.bank.fire).toBe(2);
+  });
+
+  it('never deadlocks: a single token left in the bank is still a legal take, so passing is refused', () => {
+    const game = startedGame();
+    game.board.bank = { fire: 0, water: 1, grass: 0, electric: 0, psychic: 0, prism: 0 };
+    for (const tier of [1, 2, 3] as const) {
+      game.board.market[tier] = [];
+      game.board.decks[tier] = [];
+    }
+    game.board.specialMarket = { rare: [], legendary: [] };
+
+    expect(() => applyGameAction(game, { kind: 'pass_turn', playerId: 'p1' })).toThrow(GameRuleError);
+    const legal = listLegalGameActions(game, 'p1').actions;
+    expect(legal.map((option) => option.id)).toEqual(['take:water']);
+    expect(applyGameAction(game, legal[0]!.action).currentPlayerId).toBe('p2');
+
+    game.board.bank.water = 0;
+    expect(listLegalGameActions(game, 'p1').actions.map((option) => option.id)).toEqual(['pass']);
   });
 
   it('reserves a market card and grants one prism when available', () => {
@@ -303,6 +335,94 @@ describe('game engine', () => {
     expect(updatedPlayer?.tableau.map((entry) => entry.id)).toContain(to.id);
     expect(updatedPlayer?.tableau.map((entry) => entry.id)).not.toContain(from.id);
     expect(updatedPlayer?.evolutionRecords[0]?.from.id).toBe(from.id);
+  });
+
+  it('lists buy-then-evolve: the card just bought can evolve in the same turn', () => {
+    const game = startedGame();
+    const player = game.players[0]!;
+    const from = testCard('bulbasaur-buy', 1, 'Bulbasaur', 'grass', 0, {}, {
+      pokemonId: 'bulbasaur',
+      evolvesTo: { pokemonId: 'ivysaur', requirement: {} },
+    });
+    const to = testCard('ivysaur-buy', 2, 'Ivysaur', 'grass', 3, {}, { pokemonId: 'ivysaur' });
+    game.board.market[1][0] = from;
+    game.board.market[2][0] = to;
+    player.tableau = [];
+
+    const evolveAfterBuy = listLegalGameActions(game, 'p1').actions.find((entry) =>
+      entry.action.kind === 'buy_card'
+      && entry.action.source.kind === 'market'
+      && entry.action.source.cardId === from.id
+      && entry.action.evolution?.fromCardId === from.id);
+    expect(evolveAfterBuy).toBeDefined();
+
+    const next = applyGameAction(game, evolveAfterBuy!.action);
+    expect(next.players[0]?.tableau.map((card) => card.id)).toEqual([to.id]);
+  });
+
+  it('lists reserve-then-evolve against the reserved copy, never the market slot it just left', () => {
+    const game = startedGame();
+    const player = game.players[0]!;
+    const from = testCard('bulbasaur-res', 1, 'Bulbasaur', 'grass', 0, {}, {
+      pokemonId: 'bulbasaur',
+      evolvesTo: { pokemonId: 'ivysaur', requirement: {} },
+    });
+    const to = testCard('ivysaur-res', 2, 'Ivysaur', 'grass', 3, {}, { pokemonId: 'ivysaur' });
+    player.tableau = [from];
+    game.board.market[2][0] = to;
+
+    const reserveOptions = listLegalGameActions(game, 'p1').actions.filter((entry) =>
+      entry.action.kind === 'reserve_card' && entry.action.source.kind === 'market' && entry.action.source.cardId === to.id);
+    const targets = reserveOptions.flatMap((entry) => (entry.action.kind === 'reserve_card' && entry.action.evolution ? [entry.action.evolution.to.kind] : []));
+    expect(targets).toEqual(['reserved']);
+    for (const option of reserveOptions) {
+      expect(() => applyGameAction(game, option.action)).not.toThrow();
+    }
+  });
+
+  it('returns a leaving player\'s tokens to the bank and skips their seat afterwards', () => {
+    const lobby = addPlayerToLobby(addPlayerToLobby(createLobbyState('room_t', 'T', { id: 'p1', name: 'A' }), { id: 'p2', name: 'B' }), { id: 'p3', name: 'C' });
+    const game = startGame(lobby, 'p1');
+    const afterTake = applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'water', 'grass'] });
+    const bankBefore = { ...afterTake.board.bank };
+
+    const left = abandonGame(afterTake, 'p1');
+    expect(left.players[0]?.tokens).toEqual(emptyTokenBank());
+    expect(left.board.bank.fire).toBe(bankBefore.fire + 1);
+    expect(left.board.bank.water).toBe(bankBefore.water + 1);
+    expect(left.status).toBe('playing');
+
+    const p2 = applyGameAction(left, { kind: 'take_tokens', playerId: 'p2', tokens: ['fire', 'water', 'grass'] });
+    expect(p2.currentPlayerId).toBe('p3');
+    const p3 = applyGameAction(p2, { kind: 'take_tokens', playerId: 'p3', tokens: ['fire', 'water', 'grass'] });
+    expect(p3.currentPlayerId).toBe('p2');
+  });
+
+  it('skips a timed-out turn without acting for the player and restarts the turn clock', () => {
+    const game = startGame(addPlayerToLobby(createLobbyState('room_t', 'T', { id: 'p1', name: 'A' }), { id: 'p2', name: 'B' }), 'p1', '2026-01-01T00:00:00.000Z');
+    expect(game.turnStartedAt).toBe('2026-01-01T00:00:00.000Z');
+
+    const skipped = skipTurn(game, 'p1', '2026-01-01T00:05:00.000Z');
+    expect(skipped.currentPlayerId).toBe('p2');
+    expect(skipped.players[0]?.tokens).toEqual(emptyTokenBank());
+    expect(skipped.board.bank).toEqual(game.board.bank);
+    expect(skipped.turnStartedAt).toBe('2026-01-01T00:05:00.000Z');
+    expect(() => skipTurn(skipped, 'p1')).toThrow(GameRuleError);
+  });
+
+  it('marks a player leaving a finished table as left so a rematch excludes them', () => {
+    const game = startedGame();
+    const finished = abandonGame(game, 'p2');
+    expect(finished.status).toBe('finished');
+    const lobby3 = addPlayerToLobby(addPlayerToLobby(createLobbyState('room_t', 'T', { id: 'p1', name: 'A' }), { id: 'p2', name: 'B' }), { id: 'p3', name: 'C' });
+    let three = startGame(lobby3, 'p1');
+    three = { ...three, status: 'finished', currentPlayerId: null };
+
+    const afterLeave = leaveFinishedGame(three, 'p1');
+    expect(afterLeave.players[0]?.status).toBe('left');
+    expect(afterLeave.hostPlayerId).toBe('p2');
+    const rematch = returnToLobby(afterLeave, 'p2');
+    expect(rematch.players.map((player) => player.id)).toEqual(['p2', 'p3']);
   });
 
   it('uses Pokemon edition tie breakers: most evolutions, then most Pokemon in play', () => {

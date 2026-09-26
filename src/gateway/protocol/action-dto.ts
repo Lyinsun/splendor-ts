@@ -1,4 +1,4 @@
-import type { ActionCommand } from '../../game/application/room-service.js';
+import type { ActionCommand, ActionOptions } from '../../game/application/room-service.js';
 import {
   SPECIAL_CARD_RANKS,
   TOKEN_KINDS,
@@ -79,6 +79,27 @@ export function optionalClientActionId(body: JsonObject): string | undefined {
     throw new RequestValidationError(`clientActionId must be a string of 1-${CLIENT_ACTION_ID_MAX_LENGTH} characters.`);
   }
   return value;
+}
+
+/** `expectedVersion`: the room version the client acted on (optimistic concurrency, see ActionOptions). */
+export function optionalExpectedVersion(body: JsonObject): number | undefined {
+  const value = body.expectedVersion;
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
+    throw new RequestValidationError('expectedVersion must be a positive integer.');
+  }
+  return value;
+}
+
+export function actionOptions(body: JsonObject): ActionOptions {
+  const clientActionId = optionalClientActionId(body);
+  const expectedVersion = optionalExpectedVersion(body);
+  return {
+    ...(clientActionId === undefined ? {} : { clientActionId }),
+    ...(expectedVersion === undefined ? {} : { expectedVersion }),
+  };
 }
 
 /** Parses an action body. `kind` comes from the route for the typed endpoints, or from the body otherwise. */

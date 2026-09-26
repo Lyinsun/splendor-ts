@@ -67,8 +67,8 @@ function prepareIndexHtml(html: string, publicBasePath: string): string {
     .replaceAll("'/dashboard-assets/", `'${normalizedBase}/dashboard-assets/`);
 }
 
-async function serveFile(c: Context, root: string, relativePath: string): Promise<Response> {
-  const safePath = safeJoin(root, relativePath);
+async function serveFile(c: Context, root: string, relativePath: string | null): Promise<Response> {
+  const safePath = relativePath === null ? null : safeJoin(root, relativePath);
   if (safePath === null) {
     return c.text('Not found', 404);
   }
@@ -87,10 +87,15 @@ async function serveFile(c: Context, root: string, relativePath: string): Promis
   }
 }
 
-function routeRelativePath(c: Context, prefix: string): string {
+/** Null for malformed percent-encoding (e.g. `%E0%A4%A`), which is a 404 rather than a server error. */
+function routeRelativePath(c: Context, prefix: string): string | null {
   const pathname = new URL(c.req.url).pathname;
   const raw = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : '';
-  return decodeURIComponent(raw || 'index.html');
+  try {
+    return decodeURIComponent(raw || 'index.html');
+  } catch {
+    return null;
+  }
 }
 
 function joinRoute(publicBasePath: string, route: string): string {

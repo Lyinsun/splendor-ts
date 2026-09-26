@@ -217,6 +217,49 @@ describe('websocket multi-device sync', () => {
     expect(await hostPhone.waitFor((m) => m.requestId === 'dup')).toMatchObject({ ok: true, version: snapshotVersion });
   });
 
+  it('revokes a kicked seat on its open sockets and drops it from presence', async () => {
+    const { http, connect } = await startServer();
+    const host = await http('POST', '/v1/rooms', { playerName: 'Ada' });
+    const roomId = host.room.roomId as string;
+    const guest = await http('POST', `/v1/rooms/${roomId}/join`, { playerName: 'Blaise' });
+    const hostClient = await connect(roomId, host.seatToken);
+    const guestClient = await connect(roomId, guest.seatToken);
+    await hostClient.waitFor((m) => m.type === 'room_state' && m.onlinePlayerIds.length === 2);
+
+    const kicked = await http('POST', `/v1/rooms/${roomId}/kick`, { playerId: guest.playerId }, host.seatToken);
+    expect(kicked.players).toHaveLength(1);
+
+    expect(await guestClient.waitFor((m) => m.type === 'seat_revoked')).toMatchObject({ roomId, playerId: guest.playerId });
+    // The revoked socket keeps receiving the room, now as a spectator.
+    const revokedAt = guestClient.messages.findIndex((m) => m.type === 'seat_revoked');
+    await guestClient.waitFor((m) => m.type === 'room_state' && guestClient.messages.indexOf(m) > revokedAt);
+    const spectatorView = guestClient.messages.slice(revokedAt).find((m) => m.type === 'room_state')!;
+    expect(spectatorView.room.viewerPlayerId).toBeNull();
+    expect(spectatorView.room.players).toHaveLength(1);
+    const hostView = await hostClient.waitFor((m) => m.type === 'room_state' && m.room.players.length === 1);
+    expect(hostView.onlinePlayerIds).toEqual([host.playerId]);
+
+    guestClient.send({ type: 'action', requestId: 'after-kick', action: { kind: 'pass_turn' } });
+    expect(await guestClient.waitFor((m) => m.requestId === 'after-kick')).toMatchObject({ ok: false, error_code: 'not_authenticated' });
+  });
+
+  it('rejects a stale expectedVersion over the socket but replays a known clientActionId', async () => {
+    const { http, connect } = await startServer();
+    const host = await http('POST', '/v1/rooms', { playerName: 'Ada' });
+    const roomId = host.room.roomId as string;
+    await http('POST', `/v1/rooms/${roomId}/join`, { playerName: 'Blaise' });
+    const started = await http('POST', `/v1/rooms/${roomId}/start`, undefined, host.seatToken);
+    const hostClient = await connect(roomId, host.seatToken);
+    const action = { kind: 'take_tokens', tokens: ['fire', 'water', 'grass'] };
+
+    hostClient.send({ type: 'action', requestId: 'r1', action, clientActionId: 'm1', expectedVersion: started.version });
+    expect(await hostClient.waitFor((m) => m.requestId === 'r1')).toMatchObject({ ok: true, version: started.version + 1 });
+    hostClient.send({ type: 'action', requestId: 'r2', action, clientActionId: 'm1', expectedVersion: started.version });
+    expect(await hostClient.waitFor((m) => m.requestId === 'r2')).toMatchObject({ ok: true, version: started.version + 1 });
+    hostClient.send({ type: 'action', requestId: 'r3', action, clientActionId: 'm2', expectedVersion: started.version });
+    expect(await hostClient.waitFor((m) => m.requestId === 'r3')).toMatchObject({ ok: false, error_code: 'stale_state' });
+  });
+
   it('updates presence when a device disconnects and closes sockets when the room is removed', async () => {
     const { http, connect } = await startServer();
     const host = await http('POST', '/v1/rooms', { playerName: 'Ada' });

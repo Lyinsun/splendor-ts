@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { RoomLimitError, RoomNotFoundError, RoomService, SeatAuthError, type ActionCommand } from '../src/game/application/room-service.js';
+import { InMemoryRoomRepository } from '../src/game/application/room-repository.js';
 import { SqliteRoomRepository } from '../src/game/infrastructure/sqlite-room-repository.js';
 import { GameRuleError } from '../src/game/domain/types.js';
 
@@ -52,8 +53,8 @@ describe('room service', () => {
     const { service, roomId, room, tokenOf } = startedRoom();
     const token = tokenOf(room.currentPlayerId);
     const command: ActionCommand = { kind: 'take_tokens', tokens: ['fire', 'water', 'grass'] };
-    const first = service.applyAction(roomId, token, command, 'retry-1');
-    const second = service.applyAction(roomId, token, command, 'retry-1');
+    const first = service.applyAction(roomId, token, command, { clientActionId: 'retry-1' });
+    const second = service.applyAction(roomId, token, command, { clientActionId: 'retry-1' });
     expect(second.version).toBe(first.version);
     expect(second.turn).toBe(first.turn);
   });
@@ -111,7 +112,7 @@ describe('room service', () => {
     expect(() => service.getRoomView(host.room.roomId)).toThrow(RoomNotFoundError);
   });
 
-  it('auto-plays idle turns after the timeout and garbage-collects idle rooms', () => {
+  it('skips idle turns after the timeout without acting, and garbage-collects idle rooms', () => {
     let now = Date.parse('2026-01-01T00:00:00Z');
     const clock = () => new Date(now);
     const service = new RoomService({ turnTimeoutMs: 60_000, clock, idleTtlMs: { finished: 1000 } });
@@ -124,12 +125,89 @@ describe('room service', () => {
     const after = service.getRoomView(roomId);
     expect(after.currentPlayerId).not.toBe(room.currentPlayerId);
     expect(after.version).toBe(room.version + 1);
+    // Skipped, not played: nobody gained tokens and the bank is untouched.
+    expect(after.board.bank).toEqual(room.board.bank);
+    expect(after.players.every((player) => Object.values(player.tokens).every((count) => count === 0))).toBe(true);
 
     const lobbyOnly = service.createRoom({ playerName: 'Idle' });
     now += 3 * 60 * 60 * 1000;
     const removed = service.sweepIdleRooms();
     expect(removed).toContain(lobbyOnly.room.roomId);
     expect(removed).not.toContain(roomId);
+  });
+
+  it('times turns from turnStartedAt, not from unrelated room activity', () => {
+    let now = Date.parse('2026-01-01T00:00:00Z');
+    const service = new RoomService({ turnTimeoutMs: 60_000, clock: () => new Date(now) });
+    const a = service.createRoom({ playerName: 'A' });
+    const roomId = a.room.roomId;
+    service.joinRoom(roomId, 'B');
+    const c = service.joinRoom(roomId, 'C');
+    const started = service.startRoom(roomId, a.seatToken);
+    expect(started.currentPlayerId).toBe(a.playerId);
+
+    now += 50_000;
+    // Another seat leaving bumps updatedAt but must not restart A's turn clock.
+    service.leaveRoom(roomId, c.seatToken);
+    now += 11_000;
+    expect(service.expireIdleTurns()).toBe(1);
+    expect(service.getRoomView(roomId).currentPlayerId).not.toBe(a.playerId);
+    now += 30_000;
+    expect(service.expireIdleTurns()).toBe(0);
+  });
+
+  it('revokes the seat token whenever a player leaves, including mid-game and after the game', () => {
+    const service = new RoomService();
+    const a = service.createRoom({ playerName: 'A' });
+    const roomId = a.room.roomId;
+    const b = service.joinRoom(roomId, 'B');
+    const c = service.joinRoom(roomId, 'C');
+    service.startRoom(roomId, a.seatToken);
+
+    service.leaveRoom(roomId, b.seatToken);
+    expect(() => service.authenticate(roomId, b.seatToken)).toThrow(SeatAuthError);
+    expect(() => service.leaveRoom(roomId, b.seatToken)).toThrow(SeatAuthError);
+
+    const finished = service.leaveRoom(roomId, c.seatToken)!;
+    expect(finished.status).toBe('finished');
+
+    // Leaving a finished table used to be a silent no-op that kept the seat for the rematch.
+    expect(service.leaveRoom(roomId, a.seatToken)).toBeNull();
+    expect(service.hasRoom(roomId)).toBe(false);
+  });
+
+  it('rejects an action built on a stale version unless it is a replay of an applied action', () => {
+    const { service, roomId, room, tokenOf } = startedRoom();
+    const token = tokenOf(room.currentPlayerId);
+    const command: ActionCommand = { kind: 'take_tokens', tokens: ['fire', 'water', 'grass'] };
+    const applied = service.applyAction(roomId, token, command, { clientActionId: 'move-1', expectedVersion: room.version });
+    expect(applied.version).toBe(room.version + 1);
+
+    // Same id, same (now stale) version: an idempotent retry, not a conflict.
+    expect(service.applyAction(roomId, token, command, { clientActionId: 'move-1', expectedVersion: room.version }).version).toBe(applied.version);
+
+    const nextToken = tokenOf(applied.currentPlayerId);
+    expect(() => service.applyAction(roomId, nextToken, command, { clientActionId: 'move-2', expectedVersion: room.version }))
+      .toThrow(expect.objectContaining({ code: 'stale_state' }));
+    expect(service.applyAction(roomId, nextToken, command, { expectedVersion: applied.version }).version).toBe(applied.version + 1);
+  });
+
+  it('persists before mutating memory, so a failed write leaves the room unchanged', () => {
+    const repository = new InMemoryRoomRepository();
+    const service = new RoomService({ repository });
+    const { roomId, room, tokenOf } = startedRoom(service);
+    const token = tokenOf(room.currentPlayerId);
+    const events: string[] = [];
+    service.subscribe((id) => events.push(id));
+    repository.save = () => {
+      throw new Error('disk full');
+    };
+
+    expect(() => service.applyAction(roomId, token, { kind: 'take_tokens', tokens: ['fire', 'water', 'grass'] }, { clientActionId: 'x' })).toThrow('disk full');
+    const view = service.getRoomView(roomId);
+    expect(view.version).toBe(room.version);
+    expect(view.currentPlayerId).toBe(room.currentPlayerId);
+    expect(events).toEqual([]);
   });
 
   it('enforces the room cap', () => {

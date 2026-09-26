@@ -1,7 +1,7 @@
 import { applyGameAction, MAX_TOKENS_PER_PLAYER } from './engine.js';
+import { enumerateTokenTakes } from './token-rules.js';
 import {
   CARD_TIERS,
-  ELEMENTS,
   SPECIAL_CARD_RANKS,
   TOKEN_KINDS,
   type CardSource,
@@ -48,10 +48,11 @@ export function listLegalGameActions(state: GameState, playerId: string): LegalG
     ...buyCardCandidates(state, playerId),
   ];
   const discardOptions = discardTokenOptions();
-  const evolutionOptions = [null, ...evolutionCandidates(state, playerId)] satisfies Array<EvolutionSelection | null>;
   const options = new Map<string, LegalGameActionOption>();
 
   for (const baseAction of baseActions) {
+    // Evolution is settled after the main action, so the card just bought or reserved can take part.
+    const evolutionOptions = [null, ...evolutionCandidates(state, playerId, baseAction)] satisfies Array<EvolutionSelection | null>;
     // Only the exact discard size required after this action can be legal, so skip the rest of the search space.
     const discardSize = requiredDiscardSize(state, baseAction);
     for (const discardTokens of discardOptions.filter((option) => option.length === discardSize)) {
@@ -89,39 +90,7 @@ export function listLegalGameActions(state: GameState, playerId: string): LegalG
 }
 
 function takeTokenCandidates(state: GameState, playerId: string): GameAction[] {
-  const actions: GameAction[] = [];
-  const availableElements = ELEMENTS.filter((element) => state.board.bank[element] > 0);
-  for (let left = 0; left < availableElements.length; left += 1) {
-    for (let middle = left + 1; middle < availableElements.length; middle += 1) {
-      for (let right = middle + 1; right < availableElements.length; right += 1) {
-        const tokens = [availableElements[left], availableElements[middle], availableElements[right]];
-        if (tokens.every((token) => token !== undefined)) {
-          actions.push({ kind: 'take_tokens', playerId, tokens: tokens as TokenKind[] });
-        }
-      }
-    }
-  }
-
-  if (availableElements.length <= 2) {
-    for (const duplicate of availableElements) {
-      if (state.board.bank[duplicate] < 2) {
-        continue;
-      }
-      for (const other of availableElements) {
-        if (other !== duplicate && state.board.bank[other] > 0) {
-          actions.push({ kind: 'take_tokens', playerId, tokens: [duplicate, duplicate, other] });
-        }
-      }
-    }
-  }
-
-  for (const element of ELEMENTS) {
-    if (state.board.bank[element] >= 4) {
-      actions.push({ kind: 'take_tokens', playerId, tokens: [element, element] });
-    }
-  }
-
-  return actions;
+  return enumerateTokenTakes(state.board.bank).map((tokens) => ({ kind: 'take_tokens', playerId, tokens }));
 }
 
 function reserveCardCandidates(state: GameState, playerId: string): GameAction[] {
@@ -207,23 +176,32 @@ function collectTokenMultisets(length: number, start: number, current: TokenKind
   }
 }
 
-function evolutionCandidates(state: GameState, playerId: string): EvolutionSelection[] {
+function evolutionCandidates(state: GameState, playerId: string, baseAction: GameAction): EvolutionSelection[] {
   const player = state.players.find((entry) => entry.id === playerId);
   if (player === undefined) {
     return [];
   }
-  // Evolution sources must be cards you own and have in play (tableau only).
-  const sourceCards = player.tableau;
+  const acquired = acquiredCard(state, player.reserved, baseAction);
+  // Evolution sources must be cards you own and have in play (tableau only), including the card just bought.
+  const sourceCards = baseAction.kind === 'buy_card' && acquired !== undefined ? [...player.tableau, acquired] : player.tableau;
   const sourceIds = new Set(sourceCards.map((card) => card.id));
   const sourcePokemonIds = new Set(sourceCards.map((card) => pokemonIdForEvolution(card)));
   const targets: EvolutionTargetCandidate[] = [];
   for (const tier of CARD_TIERS) {
     for (const card of state.board.market[tier]) {
-      targets.push({ card, source: { kind: 'market', tier, cardId: card.id } });
+      if (card.id !== acquired?.id) {
+        targets.push({ card, source: { kind: 'market', tier, cardId: card.id } });
+      }
     }
   }
   for (const card of player.reserved) {
-    targets.push({ card, source: { kind: 'reserved', cardId: card.id } });
+    if (card.id !== acquired?.id) {
+      targets.push({ card, source: { kind: 'reserved', cardId: card.id } });
+    }
+  }
+  // A card reserved from the open market this turn is now a reserved-card evolution target.
+  if (baseAction.kind === 'reserve_card' && acquired !== undefined) {
+    targets.push({ card: acquired, source: { kind: 'reserved', cardId: acquired.id } });
   }
 
   const candidates = new Map<string, EvolutionSelection>();
@@ -261,6 +239,22 @@ function evolutionCandidates(state: GameState, playerId: string): EvolutionSelec
     candidates.set(evolutionKey(selection), selection);
   }
   return [...candidates.values()];
+}
+
+/**
+ * The face-up card a buy or market reserve moves to the player. Deck reserves are skipped:
+ * the top card is hidden, and enumerating it would leak the deck through the action list.
+ */
+function acquiredCard(state: GameState, reserved: CompanionCard[], action: GameAction): CompanionCard | undefined {
+  if (action.kind === 'buy_card') {
+    return action.source.kind === 'reserved'
+      ? reserved.find((card) => card.id === action.source.cardId)
+      : findCardBySource(state, action.source);
+  }
+  if (action.kind === 'reserve_card' && action.source.kind === 'market') {
+    return findCardBySource(state, action.source);
+  }
+  return undefined;
 }
 
 function requiredDiscardSize(state: GameState, action: GameAction): number {

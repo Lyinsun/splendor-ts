@@ -10,6 +10,7 @@ export function CompanionCardView(props: {
   disabled: boolean;
   affordable: boolean;
   compact?: boolean;
+  pending?: boolean;
   onReserve?: () => void;
   onBuy: () => void;
 }) {
@@ -22,7 +23,7 @@ export function CompanionCardView(props: {
   const elementColor = elementColorFor(props.card.element);
   return (
     <article
-      className={`companion-card ${tokenClassName(props.card.element)} ${props.compact === true ? 'compact-card' : ''} ${cardFaceClass} ${affordabilityClass}`}
+      className={`companion-card ${tokenClassName(props.card.element)} ${props.compact === true ? 'compact-card' : ''} ${cardFaceClass} ${affordabilityClass}${props.pending === true ? ' is-pending' : ''}`}
       aria-label={`${text.name}, ${props.card.points} ${props.copy.glory}, ${tokenLabel(props.card.element, props.locale)} type`}
     >
       <div className={`card-art ${cardArtClass}`}>

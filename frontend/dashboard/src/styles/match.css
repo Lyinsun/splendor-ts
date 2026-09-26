@@ -977,6 +977,49 @@ button.tray-slot:hover {
   font-size: 12px;
 }
 
+/* A staged reserve waits here for an explicit confirm (it also hands out a Master Ball). */
+.tray-reserve {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #2a2140;
+  border: 1px solid rgba(167, 139, 250, 0.7);
+  font-size: 12px;
+}
+
+.tray-reserve-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tray-reserve-text span {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tray-reserve-text small {
+  opacity: 0.8;
+}
+
+.tray-reserve-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.companion-card.is-pending,
+.deck-back.is-pending {
+  outline: 3px solid #a78bfa;
+  outline-offset: 2px;
+  box-shadow: 0 0 18px rgba(167, 139, 250, 0.55);
+}
+
 /* An over-10 take floats above the tray so the one-screen layout does not reflow. */
 .tray-discard.is-floating {
   position: absolute;

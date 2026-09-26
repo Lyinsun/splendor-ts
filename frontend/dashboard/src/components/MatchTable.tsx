@@ -14,7 +14,7 @@ import {
   type AppCopy,
 } from '../presentation/gameRules';
 import { MATCH_COPY, type MatchCopy } from '../presentation/matchCopy';
-import { formatLogMessage, leaderName, tokenClassName, tokenLabel, type Locale, type ThemeId } from '../presentation/themes';
+import { cardText, formatLogMessage, leaderName, tokenClassName, tokenLabel, type Locale, type ThemeId } from '../presentation/themes';
 import { canAddToken, isCompleteTake, pickRefusal, type PickRefusal } from '../presentation/tokenTakes';
 import { PokeBall } from './PokeBall';
 import { CompanionCardView, CostList, HiddenCardChip, PlayerCardStrip } from './tableViews';
@@ -62,6 +62,21 @@ export function MatchTable(props: MatchTableProps) {
   const others = room.players.filter((player) => player.id !== me?.id);
   const [pickNotice, setPickNotice] = useState<string | null>(null);
   const pendingPick = useRef<FlightOrigin | null>(null);
+  // Reserving also hands out a Master Ball, so a card click only stages it; the tray confirms.
+  const [stagedReserve, setStagedReserve] = useState<MarketSource | null>(null);
+  const pendingReserve = canAct && stagedReserve !== null && reserveStillOpen(room, stagedReserve) ? stagedReserve : null;
+
+  useEffect(() => {
+    if (!canAct) setStagedReserve(null);
+  }, [canAct]);
+
+  const stageReserve = (source: MarketSource) => {
+    if (!canAct) return;
+    setPickNotice(null);
+    props.onTokenSelectionChange([]);
+    setStagedReserve(source);
+  };
+  const cancelReserve = () => setStagedReserve(null);
 
   useEffect(() => {
     if (pickNotice === null) return undefined;
@@ -70,7 +85,9 @@ export function MatchTable(props: MatchTableProps) {
   }, [pickNotice]);
 
   // Keep the discard draft no longer than what the current plan requires.
-  const discardNeeded = me === undefined ? 0 : requiredDiscards(room, me, props.tokenSelection);
+  const discardNeeded = me === undefined || (props.tokenSelection.length === 0 && pendingReserve === null)
+    ? 0
+    : requiredDiscards(room, me, props.tokenSelection);
   useEffect(() => {
     if (props.discardSelection.length > discardNeeded) {
       props.onDiscardSelectionChange(props.discardSelection.slice(0, discardNeeded));
@@ -85,6 +102,7 @@ export function MatchTable(props: MatchTableProps) {
       if (stack !== null) shake(stack);
       return;
     }
+    setStagedReserve(null);
     const refusal = pickRefusal(room.board.bank, props.tokenSelection, kind);
     if (refusal !== null) {
       if (stack !== null) shake(stack);
@@ -114,6 +132,13 @@ export function MatchTable(props: MatchTableProps) {
     : describeTokenTakeSelectionProblem(props.copy, props.locale, room, me, props.tokenSelection, props.discardSelection);
   const takeReady = canAct && isCompleteTake(room.board.bank, props.tokenSelection) && selectionProblem === null;
 
+  const handFull = me !== undefined && me.reserved.length >= 3;
+  const reserveReady = pendingReserve !== null && !handFull && props.discardSelection.length >= discardNeeded;
+  const confirmReserve = () => {
+    if (pendingReserve === null || !reserveReady) return;
+    props.onReserve(pendingReserve);
+  };
+
   const confirm = () => {
     if (!takeReady) return;
     const slots = Array.from(document.querySelectorAll<HTMLElement>('.tray-slot[data-kind]'));
@@ -132,10 +157,14 @@ export function MatchTable(props: MatchTableProps) {
       if (Number.isInteger(index) && index >= 0 && index < ELEMENTS.length) {
         event.preventDefault();
         pick(ELEMENTS[index]!);
+      } else if (event.key === 'Enter' && pendingReserve !== null) {
+        event.preventDefault();
+        confirmReserve();
       } else if (event.key === 'Enter' && props.tokenSelection.length > 0) {
         event.preventDefault();
         confirm();
       } else if (event.key === 'Escape') {
+        cancelReserve();
         props.onTokenSelectionChange([]);
         setPickNotice(null);
       } else if (event.key === 'Backspace' && props.tokenSelection.length > 0) {
@@ -183,9 +212,9 @@ export function MatchTable(props: MatchTableProps) {
             <div className={`market-row tier-${tier}`} key={tier}>
               <button
                 type="button"
-                className={`deck-back tier-${tier}`}
+                className={`deck-back tier-${tier}${pendingReserve?.kind === 'deck' && pendingReserve.tier === tier ? ' is-pending' : ''}`}
                 disabled={!canAct || room.board.deckCounts[tier] <= 0}
-                onClick={() => props.onReserve({ kind: 'deck', tier })}
+                onClick={() => stageReserve({ kind: 'deck', tier })}
                 title={`${match.reserveTop} · ${props.copy.tier} ${tier}`}
               >
                 <span className="deck-tier">{'★'.repeat(tier)}</span>
@@ -201,7 +230,8 @@ export function MatchTable(props: MatchTableProps) {
                   card={card}
                   disabled={!canAct}
                   affordable={me !== undefined && canAfford(me, card)}
-                  onReserve={() => props.onReserve({ kind: 'market', tier, cardId: card.id })}
+                  pending={pendingReserve?.kind === 'market' && pendingReserve.cardId === card.id}
+                  onReserve={() => stageReserve({ kind: 'market', tier, cardId: card.id })}
                   onBuy={() => props.onBuy({ kind: 'market', tier, cardId: card.id })}
                 />
               ))}
@@ -255,6 +285,10 @@ export function MatchTable(props: MatchTableProps) {
             takeReady={takeReady}
             message={trayMessage}
             discardNeeded={discardNeeded}
+            pendingReserve={pendingReserve}
+            reserveReady={reserveReady}
+            onConfirmReserve={confirmReserve}
+            onCancelReserve={cancelReserve}
             pendingPick={pendingPick}
             onReturn={returnAt}
             onConfirm={confirm}
@@ -364,6 +398,10 @@ function ActionTray(props: MatchTableProps & {
   takeReady: boolean;
   message: string | null;
   discardNeeded: number;
+  pendingReserve: MarketSource | null;
+  reserveReady: boolean;
+  onConfirmReserve: () => void;
+  onCancelReserve: () => void;
   pendingPick: React.MutableRefObject<FlightOrigin | null>;
   onReturn: (index: number, element: Element | null) => void;
   onConfirm: () => void;
@@ -426,6 +464,26 @@ function ActionTray(props: MatchTableProps & {
           </button>
         </div>
       </div>
+
+      {props.canAct && props.pendingReserve !== null ? (
+        <div className="tray-reserve" role="group" aria-label={props.match.reserveConfirmTitle}>
+          <div className="tray-reserve-text">
+            <strong>{props.match.reserveConfirmTitle}</strong>
+            <span>{reserveTargetName(props.room, props.pendingReserve, props.locale, props.themeId, props.match)}</span>
+            <small>
+              {props.room.board.bank.prism > 0 ? props.match.reserveGetsMaster : props.match.reserveNoMaster}
+              {' · '}
+              {props.me.reserved.length >= 3 ? props.match.reserveHandFull : props.match.reserveHand(props.me.reserved.length + 1)}
+            </small>
+          </div>
+          <div className="tray-reserve-actions">
+            <button type="button" className="ghost-button" onClick={props.onCancelReserve}>{props.match.reserveCancel}</button>
+            <button type="button" className="primary-button" onClick={props.onConfirmReserve} disabled={!props.reserveReady || props.busy}>
+              {props.busy ? <span className="spinner" /> : <Check size={16} />} {props.match.reserveConfirm}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {showDiscard ? (
         <div className={`tray-discard${props.tokenSelection.length > 0 ? ' is-floating' : ''}`}>
@@ -632,6 +690,17 @@ function SpecialCards(props: { copy: AppCopy; locale: Locale; themeId: ThemeId; 
       </div>
     </section>
   );
+}
+
+function reserveStillOpen(room: GameState, source: MarketSource): boolean {
+  if (source.kind === 'deck') return room.board.deckCounts[source.tier] > 0;
+  return room.board.market[source.tier].some((card) => card.id === source.cardId);
+}
+
+function reserveTargetName(room: GameState, source: MarketSource, locale: Locale, themeId: ThemeId, match: MatchCopy): string {
+  if (source.kind === 'deck') return match.reserveDeckTarget('★'.repeat(source.tier));
+  const card = room.board.market[source.tier].find((entry) => entry.id === source.cardId);
+  return card === undefined ? '' : cardText(card, locale, themeId).name;
 }
 
 function requiredDiscards(room: GameState, me: PlayerState, selection: TokenKind[]): number {

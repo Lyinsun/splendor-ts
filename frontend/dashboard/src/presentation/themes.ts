@@ -311,7 +311,7 @@ export const APP_COPY = {
         },
         {
           title: '第 3 步：进行回合',
-          body: '轮到你时，可以从精灵球供应区拿球、保留卡牌或捕获卡牌。目标是通过捕获宝可梦和获得训练师徽章来积累分数，率先达到 18 分触发游戏结束！',
+          body: '轮到你时，可以从精灵球供应区拿球、保留卡牌或捕获卡牌。目标是通过捕获和进化宝可梦来积累分数，率先达到 18 分触发游戏结束！',
         },
       ],
       tip: '提示：拿球时可以选择 3 种不同精灵球，或 2 枚相同精灵球（银行需剩余 ≥ 4 枚）。',
@@ -352,12 +352,6 @@ export const APP_COPY = {
           ],
         },
         {
-          title: '训练师徽章',
-          items: [
-            { name: '自动获得', desc: '当你的属性加成满足训练师人物的要求时，该训练师自动加入你的队伍并提供额外分数。' },
-          ],
-        },
-        {
           title: '终局与胜负',
           items: [
             { name: '终局触发', desc: '任意玩家分数达到 18 分时，本轮结束后游戏终止。本轮中尚未行动的玩家可以再行动一次。' },
@@ -372,7 +366,6 @@ export const APP_COPY = {
         { title: '回合结算', desc: '精灵球供应下方。如果拿球后超过 10 枚，需要在此选择要弃掉的球。还可以选择是否进行进化。' },
         { title: '卡牌市场', desc: '中央区域。按等级 1/2/3 排列，每行 4 张公开卡 + 牌堆。点击「保留」或「购买」操作卡牌。' },
         { title: '特殊卡区', desc: '右侧上方。罕见和传说卡各展示 1 张，需要大师球才能捕获。' },
-        { title: '训练师人物', desc: '右侧下方。展示当前可获得的训练师徽章及其属性要求。' },
         { title: '保留区与战斗日志', desc: '最右侧面板。显示你保留的卡牌（可购买）和最近的战斗行动记录。' },
         { title: '训练师列表', desc: '左侧面板。显示所有玩家的分数、属性加成、精灵球数量和进化记录。当前回合玩家有金色边框。' },
         { title: '控制席位', desc: '在本地多人模式下，你可以通过下拉菜单切换控制哪个玩家的回合。' },
@@ -522,7 +515,7 @@ export const APP_COPY = {
         },
         {
           title: 'Step 3: Take your turn',
-          body: 'On your turn, take balls from the supply, reserve a card, or capture a card. The goal is to reach 18 points by capturing Pokemon and earning trainer badges to trigger the end game!',
+          body: 'On your turn, take balls from the supply, reserve a card, or capture a card. The goal is to reach 18 points by capturing and evolving Pokemon to trigger the end game!',
         },
       ],
       tip: 'Tip: When taking balls, choose 3 different kinds or 2 of the same kind (requires ≥ 4 of that ball in the bank).',
@@ -563,12 +556,6 @@ export const APP_COPY = {
           ],
         },
         {
-          title: 'Trainer Badges',
-          items: [
-            { name: 'Auto-Award', desc: 'When your element bonuses meet a Gym Leader\'s requirement, they automatically join your team and add points.' },
-          ],
-        },
-        {
           title: 'End Game & Winning',
           items: [
             { name: 'End Game Trigger', desc: 'When any player reaches 18 points, the current round finishes. Players who haven\'t played yet this round get one more turn before the game ends.' },
@@ -583,7 +570,6 @@ export const APP_COPY = {
         { title: 'Turn Settlement', desc: 'Below the ball supply. If taking would exceed 10 balls, select which to discard here. You may also choose an evolution.' },
         { title: 'Card Market', desc: 'Center area. Tiers 1/2/3 each show 4 face-up cards plus a deck. Click "Reserve" or "Buy" on a card.' },
         { title: 'Special Cards', desc: 'Upper right. Rare and Legendary cards each show 1 face-up. Requires a Master Ball to capture.' },
-        { title: 'Trainer Tiles', desc: 'Lower right. Shows available Gym Leader badges and their element requirements.' },
         { title: 'Reserve & Battle Log', desc: 'Rightmost panel. Shows your reserved cards (buyable) and recent battle action records.' },
         { title: 'Trainer List', desc: 'Left panel. Shows all players\' scores, bonuses, ball counts, and evolution records. The active turn player has a gold border.' },
         { title: 'Control Seat', desc: 'In local multi-seat mode, switch which player you control via the dropdown.' },

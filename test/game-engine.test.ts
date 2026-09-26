@@ -30,7 +30,7 @@ describe('game engine', () => {
     expect(game.board.market[1]).toHaveLength(4);
     expect(game.board.market[2]).toHaveLength(4);
     expect(game.board.market[3]).toHaveLength(4);
-    expect(game.board.gymLeaders).toHaveLength(3);
+    expect(game.board.gymLeaders).toHaveLength(0);
     expect(game.board.specialMarket.rare).toHaveLength(1);
     expect(game.board.specialMarket.legendary).toHaveLength(1);
   });
@@ -515,14 +515,13 @@ describe('game engine', () => {
     expect(() => applyGameAction(game, { kind: 'take_tokens', playerId: 'p2', tokens: ['fire', 'water', 'grass'] })).toThrow(GameRuleError);
   });
 
-  it('auto-awards a gym leader when element bonuses meet the requirement', () => {
+  it('never awards gym leaders, even when element bonuses would meet one', () => {
     const game = startedGame();
     const player = game.players[0];
     expect(player).toBeDefined();
     if (player === undefined) {
       throw new Error('missing test fixture');
     }
-    // Set up player with 4 fire bonus to qualify for Flare Warden
     player.bonuses = { ...createElementCounter(), fire: 4 };
     player.tableau = [
       testCard('fire-mon-1', 1, 'FireMon1', 'fire', 1, {}),
@@ -530,7 +529,7 @@ describe('game engine', () => {
       testCard('fire-mon-3', 1, 'FireMon3', 'fire', 1, {}),
       testCard('fire-mon-4', 1, 'FireMon4', 'fire', 1, {}),
     ];
-    // Put Flare Warden in the available leaders
+    // A room stored before the removal may still list a leader; it must not score.
     const flareWarden = GYM_LEADERS.find((leader) => leader.id === 'leader-flare');
     expect(flareWarden).toBeDefined();
     if (flareWarden === undefined) {
@@ -538,14 +537,11 @@ describe('game engine', () => {
     }
     game.board.gymLeaders = [flareWarden];
 
-    // Take tokens (any action triggers the check)
     const next = applyGameAction(game, { kind: 'take_tokens', playerId: 'p1', tokens: ['fire', 'water', 'grass'] });
     const updatedPlayer = next.players.find((entry) => entry.id === 'p1');
 
-    expect(updatedPlayer?.gymLeaders).toHaveLength(1);
-    expect(updatedPlayer?.gymLeaders[0]?.id).toBe('leader-flare');
-    expect(updatedPlayer?.score).toBe(4 + 3); // 4 from cards + 3 from gym leader
-    expect(next.board.gymLeaders).toHaveLength(0); // leader removed from board
+    expect(updatedPlayer?.gymLeaders).toHaveLength(0);
+    expect(updatedPlayer?.score).toBe(4);
   });
 
   it('applies element bonuses to reduce card cost when buying', () => {
@@ -612,7 +608,7 @@ describe('game engine', () => {
     joined4 = addPlayerToLobby(joined4, { id: 'p4', name: 'D' });
     const game4 = startGame(joined4, 'p1');
     expect(game4.board.bank.fire).toBe(7);
-    expect(game4.board.gymLeaders).toHaveLength(5); // min(4+1, 6) = 5
+    expect(game4.board.gymLeaders).toHaveLength(0);
   });
 
   it('rejects reserving a fourth card when three are already reserved', () => {

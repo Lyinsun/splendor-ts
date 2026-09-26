@@ -14,7 +14,7 @@ import {
   type AppCopy,
 } from '../presentation/gameRules';
 import { MATCH_COPY, type MatchCopy } from '../presentation/matchCopy';
-import { cardText, formatLogMessage, leaderName, tokenClassName, tokenLabel, type Locale, type ThemeId } from '../presentation/themes';
+import { cardText, formatLogMessage, tokenClassName, tokenLabel, type Locale, type ThemeId } from '../presentation/themes';
 import { canAddToken, isCompleteTake, pickRefusal, type PickRefusal } from '../presentation/tokenTakes';
 import { PokeBall } from './PokeBall';
 import { CompanionCardView, CostList, HiddenCardChip, PlayerCardStrip } from './tableViews';
@@ -245,19 +245,6 @@ export function MatchTable(props: MatchTableProps) {
 
         <aside className="match-side">
           <SpecialCards copy={props.copy} locale={props.locale} themeId={props.themeId} room={room} me={me} canAct={canAct} onBuy={props.onBuy} />
-          <section className="side-block leaders-block">
-            <h3>{props.copy.gymMentors}</h3>
-            <div className="leader-list">
-              {room.board.gymLeaders.length === 0 ? <p className="leader-empty">{match.leadersGone}</p> : null}
-              {room.board.gymLeaders.map((leader) => (
-                <div className={`leader-chip ${tokenClassName(leader.element)}`} key={leader.id}>
-                  <strong>{leaderName(leader, props.locale)}</strong>
-                  <span className="leader-points">{leader.points}</span>
-                  <CostList cost={leader.requirement} />
-                </div>
-              ))}
-            </div>
-          </section>
           <section className="side-block log-block">
             <h3>{match.log}</h3>
             <div className="match-log">

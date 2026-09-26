@@ -57,7 +57,7 @@
 | gold / joker token | prism / 万能棱晶 | 已实现 |
 | development card | CompanionCard / 元素伙伴卡 | 已实现 |
 | development card bonus | 永久元素徽章 / bonuses | 已实现 |
-| noble tile | GymLeader / 道馆导师 | 已实现，自动选择第一个满足者 |
+| noble tile | GymLeader / 道馆导师 | 已移除（2026-09-26）：宝可梦规则书没有贵族机制，只有记录进化的人物卡；开局不再发导师，也不再加分 |
 | reserve market card | 保留市场卡 | 已实现 |
 | reserve blind deck card | 盲抽保留牌堆顶卡 | 未实现 |
 | discard down to 10 after action | 超过 10 后弃资源 | Pokémon 版目标规则采用行动后公开弃到 10 |

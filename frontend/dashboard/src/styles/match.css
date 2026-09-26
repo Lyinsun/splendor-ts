@@ -1,7 +1,7 @@
 /*
  * In-match table: one screen, no page scroll on desktop.
  *   turn bar
- *   [ ball supply | market (3 tiers) | leaders / specials / log | opponents ]
+ *   [ ball supply | market (3 tiers) | specials / log | opponents ]
  *   my dock: seat + rack · action tray · reserved hand
  */
 
@@ -610,7 +610,7 @@
   }
 }
 
-/* Right side of the center: specials, leaders, log. */
+/* Right side of the center: specials and the log. */
 .match-side {
   min-height: 0;
   display: flex;
@@ -650,17 +650,6 @@
   min-height: 0;
 }
 
-.leader-list {
-  display: grid;
-  gap: 4px;
-}
-
-.leader-empty {
-  margin: 0;
-  color: rgba(245, 247, 251, 0.6);
-  font-size: 12px;
-}
-
 .market-slot {
   aspect-ratio: 420 / 648;
   width: auto;
@@ -668,32 +657,6 @@
   flex: none;
   border-radius: 8px;
   border: 1px dashed rgba(255, 255, 255, 0.12);
-}
-
-.leader-chip {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "name points" "cost cost";
-  gap: 2px 6px;
-  padding: 5px 7px;
-  border-radius: 6px;
-  font-size: 12px;
-}
-
-.leader-chip strong {
-  grid-area: name;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.leader-points {
-  grid-area: points;
-  font-weight: 900;
-}
-
-.leader-chip .cost-list {
-  grid-area: cost;
 }
 
 .match-layout .cost-chip {

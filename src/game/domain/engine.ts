@@ -1,4 +1,4 @@
-import { COMPANION_CARDS, GYM_LEADERS } from './content.js';
+import { COMPANION_CARDS } from './content.js';
 import { createSeededRandom, shuffle } from './random.js';
 import {
   CARD_TIERS,
@@ -15,7 +15,6 @@ import {
   type GameLogEntry,
   GameRuleError,
   type GameState,
-  type GymLeader,
   type PlayerState,
   type SpecialCardRank,
   type TokenKind,
@@ -127,7 +126,6 @@ export function applyGameAction(state: GameState, action: GameAction, now = new 
 
   discardDownToLimit(next, player, action.discardTokens ?? [], now);
   evolveCardIfSelected(next, player, action.evolution ?? null, now);
-  awardGymLeaderIfEligible(next, player, now);
   handleEndOfTurn(next, player, now);
   next.updatedAt = now;
   return next;
@@ -280,10 +278,6 @@ export function computeAffordableTokens(player: PlayerState, card: CompanionCard
   return { colored, prism: Math.min(prism, player.tokens.prism), missing };
 }
 
-export function canInviteGymLeader(player: PlayerState, leader: GymLeader): boolean {
-  return ELEMENTS.every((element) => player.bonuses[element] >= (leader.requirement[element] ?? 0));
-}
-
 export function canEvolve(player: PlayerState, from: CompanionCard, to: CompanionCard): boolean {
   if (to.specialRank !== undefined || from.specialRank !== undefined) {
     return false;
@@ -345,15 +339,14 @@ function createInitialBoard(seed: string, playerCount: number): BoardState {
     rare: shuffle(COMPANION_CARDS.filter((card) => card.specialRank === 'rare'), random),
     legendary: shuffle(COMPANION_CARDS.filter((card) => card.specialRank === 'legendary'), random),
   } satisfies Record<SpecialCardRank, CompanionCard[]>;
-  const leaderCount = Math.min(playerCount + 1, GYM_LEADERS.length);
-  const shuffledLeaders = shuffle([...GYM_LEADERS], random).slice(0, leaderCount);
   const board: BoardState = {
     bank: { fire: tokenCount, water: tokenCount, grass: tokenCount, electric: tokenCount, psychic: tokenCount, prism: 5 },
     decks,
     market: { 1: [], 2: [], 3: [] },
     specialDecks,
     specialMarket: { rare: [], legendary: [] },
-    gymLeaders: shuffledLeaders,
+    // The Pokémon rulebook has no noble-style gym leaders; the field stays empty for stored rooms.
+    gymLeaders: [],
   };
   for (const tier of CARD_TIERS) {
     refillMarket(board, tier);
@@ -517,20 +510,6 @@ function locateBuyCard(state: GameState, player: PlayerState, source: Exclude<Ca
       refillMarket(state.board, source.tier);
     },
   };
-}
-
-function awardGymLeaderIfEligible(state: GameState, player: PlayerState, now: string): void {
-  const leaderIndex = state.board.gymLeaders.findIndex((leader) => canInviteGymLeader(player, leader));
-  if (leaderIndex < 0) {
-    return;
-  }
-  const [leader] = state.board.gymLeaders.splice(leaderIndex, 1);
-  if (leader === undefined) {
-    return;
-  }
-  player.gymLeaders.push(leader);
-  recalculatePlayer(player);
-  appendLog(state, `${player.name} invited ${leader.name} for ${leader.points} glory.`, now);
 }
 
 function discardDownToLimit(state: GameState, player: PlayerState, discardTokens: TokenKind[], now: string): void {

@@ -289,7 +289,7 @@ export function App() {
           onRematch={() => void game.rematch()}
           onReserve={(source) => void handleReserve(source)}
           onBuy={(source) => void handleBuy(source)}
-          onCopy={copyText}
+          onCopy={(text) => copyText(text, copy.copyManually)}
         />
       )}
       <HelpModal open={helpOpen} initialTab={helpInitialTab} locale={locale} copy={copy as unknown as Record<string, unknown>} onClose={() => setHelpOpen(false)} />
@@ -412,12 +412,12 @@ function WaitingRoom(props: {
       <div className="panel waiting-panel">
         <div className="room-tools">
           {props.inviteLink !== null ? (
-            <button type="button" className="ghost-button" title={props.copy.inviteHint} onClick={() => copyText(props.inviteLink!)}>
+            <button type="button" className="ghost-button" title={props.copy.inviteHint} onClick={() => copyText(props.inviteLink!, props.copy.copyManually)}>
               <Copy size={16} /> {props.copy.copyInvite}
             </button>
           ) : null}
           {props.seatLink !== null ? (
-            <button type="button" className="ghost-button" title={props.copy.seatLinkHint} onClick={() => copyText(props.seatLink!)}>
+            <button type="button" className="ghost-button" title={props.copy.seatLinkHint} onClick={() => copyText(props.seatLink!, props.copy.copyManually)}>
               <Copy size={16} /> {props.copy.copySeatLink}
             </button>
           ) : null}
@@ -474,8 +474,36 @@ function WaitingRoom(props: {
   );
 }
 
-function copyText(text: string): void {
-  void navigator.clipboard?.writeText(text);
+/**
+ * The Clipboard API only exists in secure contexts (HTTPS or localhost); over plain http by IP it is undefined, so
+ * fall back to the legacy copy command, and as a last resort show the text for the user to copy by hand.
+ */
+function copyText(text: string, manualPrompt: string): void {
+  if (window.isSecureContext && navigator.clipboard !== undefined) {
+    navigator.clipboard.writeText(text).catch(() => legacyCopy(text, manualPrompt));
+    return;
+  }
+  legacyCopy(text, manualPrompt);
+}
+
+function legacyCopy(text: string, manualPrompt: string): void {
+  const field = document.createElement('textarea');
+  field.value = text;
+  field.setAttribute('readonly', '');
+  field.style.position = 'fixed';
+  field.style.opacity = '0';
+  document.body.appendChild(field);
+  field.select();
+  let copied = false;
+  try {
+    copied = document.execCommand('copy');
+  } catch {
+    copied = false;
+  }
+  field.remove();
+  if (!copied) {
+    window.prompt(manualPrompt, text);
+  }
 }
 
 function isDefaultRoomName(value: string): boolean {

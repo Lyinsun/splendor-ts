@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, gameApi } from '../api/client';
 import type { ActionOptions, CardSource, GameState, RoomSummary, SeatGrant, TokenKind } from '../api/types';
+import { randomTrainerName } from '../presentation/randomNames';
+import { browserDefaultLocale, normalizeLocale } from '../presentation/themes';
 import { publicUrl, publicWsUrl } from '../runtime/publicPath';
 
 /** `{ roomId, seats: { playerId: seatToken }, controlledPlayerId }` for the room this device sits at. */
@@ -14,6 +16,18 @@ const safeStorage = {
   set(key: string, value: string): void { try { localStorage.setItem(key, value); } catch { /* ignore */ } },
   remove(key: string): void { try { localStorage.removeItem(key); } catch { /* ignore */ } },
 };
+
+/** A stored name wins; newcomers (and the old 'Trainer' default) get a random one, kept for next time. */
+function initialPlayerName(): string {
+  const stored = safeStorage.get(NAME_KEY)?.trim();
+  if (stored !== undefined && stored !== '' && stored !== 'Trainer') {
+    return stored;
+  }
+  // Same key App.tsx keeps the chosen language under, so the name matches the UI language.
+  const name = randomTrainerName(normalizeLocale(safeStorage.get('splendor-monsters-locale'), browserDefaultLocale()));
+  safeStorage.set(NAME_KEY, name);
+  return name;
+}
 
 interface SeatSession {
   roomId: string;
@@ -43,7 +57,7 @@ export function useGameRoom() {
   const [room, setRoom] = useState<GameState | null>(null);
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [onlinePlayerIds, setOnlinePlayerIds] = useState<string[]>([]);
-  const [playerName, setPlayerName] = useState<string>(() => safeStorage.get(NAME_KEY) ?? 'Trainer');
+  const [playerName, setPlayerName] = useState<string>(initialPlayerName);
   const [error, setError] = useState<string | null>(null);
   const [lastError, setLastError] = useState<GameRoomError | null>(null);
   const [busy, setBusy] = useState(false);

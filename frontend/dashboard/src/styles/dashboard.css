@@ -175,6 +175,17 @@ label {
   padding: 0;
 }
 
+/* Lobby name input with the random-name dice beside it. */
+.name-field {
+  display: flex;
+  gap: 8px;
+}
+
+.name-field input {
+  flex: 1;
+  min-width: 0;
+}
+
 .presentation-controls {
   flex-wrap: wrap;
   justify-content: flex-end;

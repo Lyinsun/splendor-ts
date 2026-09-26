@@ -1,4 +1,4 @@
-import { CircleHelp, Copy, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users, X, Zap, ZapOff } from 'lucide-react';
+import { CircleHelp, Copy, Dices, Languages, Palette, Play, RefreshCw, ShieldPlus, Sparkles, Users, X, Zap, ZapOff } from 'lucide-react';
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import type { CardSource, EvolutionSelection, GameState, PlayerState, TokenKind } from './api/types';
 import { MatchTable } from './components/MatchTable';
@@ -8,6 +8,7 @@ import { useGameRoom } from './hooks/useGameRoom';
 import { HelpModal, hasSeenTutorial, type HelpTab } from './HelpModal';
 import { buildActionOptions, type AppCopy, type GameActionKind } from './presentation/gameRules';
 import { MATCH_COPY } from './presentation/matchCopy';
+import { randomTrainerName } from './presentation/randomNames';
 import { publicUrl } from './runtime/publicPath';
 import {
   APP_COPY,
@@ -225,6 +226,11 @@ export function App() {
             setDraftName(value);
             game.setPlayerName(value);
           }}
+          onRandomName={() => {
+            const next = randomTrainerName(locale, draftName);
+            setDraftName(next);
+            game.setPlayerName(next);
+          }}
           onRoomNameChange={setRoomName}
           onCreate={() => void game.createRoom({ playerName: draftName, roomName })}
           onJoin={(roomId) => void game.joinRoom(roomId, draftName)}
@@ -324,6 +330,7 @@ function Lobby(props: {
   roomName: string;
   busy: boolean;
   onPlayerNameChange: (value: string) => void;
+  onRandomName: () => void;
   onRoomNameChange: (value: string) => void;
   onCreate: () => void;
   onJoin: (roomId: string) => void;
@@ -334,7 +341,12 @@ function Lobby(props: {
         <h3>{props.copy.trainerSeat}</h3>
         <label>
           {props.copy.nameLabel}
-          <input value={props.playerName} onChange={(event) => props.onPlayerNameChange(event.target.value)} />
+          <span className="name-field">
+            <input value={props.playerName} maxLength={24} onChange={(event) => props.onPlayerNameChange(event.target.value)} />
+            <button type="button" className="icon-button" onClick={props.onRandomName} title={props.copy.randomName} aria-label={props.copy.randomName}>
+              <Dices size={18} />
+            </button>
+          </span>
         </label>
         <label>
           {props.copy.roomLabel}
